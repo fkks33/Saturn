@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>カラマツトレイン 京都・天使突抜店 MINI入荷速報</title>
+  <meta name="description" content="カラマツトレイン京都・天使突抜店の鉄道グッズMINI入荷速報カタログ。制帽、腕章、腕時計、鉄道部品など最新アイテムを掲載。">
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="app-bar">
+    <div class="app-bar-content">
+      <div class="brand">
+        <div class="brand-icon">
+          <span class="material-symbols-outlined">train</span>
+        </div>
+        <div class="brand-text">
+          <span class="brand-subtitle">京都・天使突抜店</span>
+          <h1 class="brand-title">MINI入荷速報</h1>
+        </div>
+      </div>
+      
+      <div class="app-bar-actions">
+        <button id="themeToggle" class="icon-button" aria-label="テーマ切り替え" title="ライト/ダークモード切替">
+          <span class="material-symbols-outlined theme-icon">dark_mode</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+    
+    <!-- Hero / Info Banner -->
+    <section class="info-card">
+      <div class="info-body">
+        <div class="info-title">
+          <span class="material-symbols-outlined">info</span>
+          <span>ご注文・お問い合わせについて</span>
+        </div>
+        <p class="info-text">
+          電話・FAX: <strong>075-365-8128</strong>（11:00〜18:00）<br>
+          商品の在庫確認・ご予約は、管理番号（例：<strong>京都-2115</strong>）をお伝えください。
+        </p>
+      </div>
+    </section>
+
+    <!-- Search & Filter Controls -->
+    <section class="controls-section">
+      <!-- Search Box -->
+      <div class="search-box">
+        <span class="material-symbols-outlined search-icon">search</span>
+        <input type="text" id="searchInput" placeholder="商品名、管理番号、キーワードで検索..." autocomplete="off">
+        <button id="clearSearch" class="clear-btn" aria-label="クリア" style="display: none;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+
+      <!-- Controls Row: Availability & Sort -->
+      <div class="controls-row">
+        <!-- Availability Toggle -->
+        <label class="switch-control">
+          <input type="checkbox" id="availableOnlyToggle">
+          <span class="slider"></span>
+          <span class="switch-label">販売中のみ表示</span>
+        </label>
+
+        <!-- Sort Select -->
+        <div class="sort-wrapper">
+          <label for="sortSelect" class="sort-label">並び順:</label>
+          <div class="select-container">
+            <select id="sortSelect">
+              <option value="newest" selected>新着順（最新入荷順）</option>
+              <option value="available_first">販売中優先 ＋ 新着順</option>
+              <option value="price_asc">価格の安い順</option>
+              <option value="price_desc">価格の高い順</option>
+              <option value="id_asc">管理番号 昇順</option>
+            </select>
+            <span class="material-symbols-outlined select-arrow">arrow_drop_down</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Filter Chips -->
+      <div class="category-chips" id="categoryChips">
+        <button class="chip active" data-category="all">すべて</button>
+        <!-- Categories will be generated dynamically -->
+      </div>
+
+      <!-- Status Bar (Count & Active Filters) -->
+      <div class="status-bar">
+        <span id="productCount" class="count-text">読み込み中...</span>
+        <span id="activeFilterBadge" class="filter-badge" style="display: none;"></span>
+      </div>
+    </section>
+
+    <!-- Product Grid -->
+    <section class="products-section">
+      <div id="productGrid" class="product-grid">
+        <!-- Product Cards injected by JS -->
+      </div>
+      
+      <!-- Empty State -->
+      <div id="emptyState" class="empty-state" style="display: none;">
+        <span class="material-symbols-outlined empty-icon">search_off</span>
+        <h3>該当する商品が見つかりませんでした</h3>
+        <p>検索条件やカテゴリを変更してお試しください。</p>
+        <button id="resetFiltersBtn" class="filled-button">条件をリセット</button>
+      </div>
+
+      <!-- Load More / Pagination -->
+      <div class="pagination-wrapper" id="paginationWrapper" style="display: none;">
+        <button id="loadMoreBtn" class="outlined-button">さらに表示する</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Image Lightbox Modal -->
+  <div id="imageModal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-dialog">
+      <button class="modal-close" id="modalClose" aria-label="閉じる">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+      <div class="modal-content">
+        <button class="modal-nav prev" id="modalPrev" aria-label="前の画像">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <div class="modal-image-wrapper">
+          <img id="modalImg" src="" alt="拡大画像">
+        </div>
+        <button class="modal-nav next" id="modalNext" aria-label="次の画像">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
+      </div>
+      <div class="modal-footer">
+        <span id="modalCaption" class="modal-caption"></span>
+        <span id="modalCounter" class="modal-counter">1 / 1</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <p class="footer-brand">カラマツトレイン 京都・天使突抜店</p>
+      <p class="footer-note">※掲載情報は元サイト（karamatsu-train.jp）の入荷速報に基づき自動同期されています。</p>
+      <p class="footer-copy">&copy; 2026 Karamatsu Train Kyoto Store Catalog</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

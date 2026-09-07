@@ -1,0 +1,71 @@
+name: Daily Crawl & Deploy to GitHub Pages
+
+on:
+  schedule:
+    # 毎日 日本時間 午前3:00 (UTC 18:00) に自動実行
+    - cron: '0 18 * * *'
+  workflow_dispatch: # GitHub画面からの手動実行ボタン
+
+# GitHub Pages へのデプロイ権限およびリポジトリへの書き込み権限
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  crawl-and-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Crawler
+        run: |
+          python crawler.py
+
+      - name: Commit and Push Changes (if updated)
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # products.json, products.db の変更をステージング
+          git add products.json products.db
+          
+          if git diff --staged --quiet; then
+            echo "No changes detected. Skipping commit."
+          else
+            echo "Changes detected! Committing and pushing..."
+            git commit -m "chore: auto-update product catalog via daily crawler [skip ci]"
+            git push origin main
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
