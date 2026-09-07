@@ -15,6 +15,7 @@ BASE_URL = "https://www.karamatsu-train.jp/s-kyoto/"
 INDEX_URL = "https://www.karamatsu-train.jp/kyoto-index.htm"
 OUTPUT_JSON = "products.json"
 OUTPUT_DB = "products.db"
+HISTORY_JSON = "crawl_history.json"
 IMAGES_DIR = "images"
 
 HEADERS = {
@@ -309,6 +310,33 @@ def save_to_db(items: list[dict]):
     conn.close()
 
 
+def record_history(pages_crawled: list[int], total_items: int, updated_count: int, status: str = "success"):
+    """直近20件のクロール実行履歴を保存"""
+    from datetime import datetime
+    history = []
+    if os.path.exists(HISTORY_JSON):
+        try:
+            with open(HISTORY_JSON, "r", encoding="utf-8") as f:
+                history = json.load(f)
+        except Exception:
+            history = []
+    
+    new_entry = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "pages_crawled": pages_crawled,
+        "total_items": total_items,
+        "updated_count": updated_count,
+        "status": status
+    }
+    
+    history.insert(0, new_entry)
+    history = history[:20]  # 直近20件
+    
+    with open(HISTORY_JSON, "w", encoding="utf-8") as f:
+        json.dump(history, f, ensure_ascii=False, indent=2)
+    print(f"✅ {HISTORY_JSON} に実行履歴を記録しました (直近 {len(history)} 件)")
+
+
 def run_crawler(pages_to_crawl: list[int] = None, download_imgs: bool = True):
     existing_items = load_existing_data()
     print(f"既存商品件数: {len(existing_items)} 件")
@@ -348,6 +376,14 @@ def run_crawler(pages_to_crawl: list[int] = None, download_imgs: bool = True):
     # SQLite保存
     save_to_db(sorted_items)
     print(f"✅ {OUTPUT_DB} を更新しました")
+
+    # 履歴保存
+    record_history(
+        pages_crawled=sorted(pages_to_crawl),
+        total_items=len(sorted_items),
+        updated_count=new_or_updated_count,
+        status="success"
+    )
 
 
 if __name__ == "__main__":

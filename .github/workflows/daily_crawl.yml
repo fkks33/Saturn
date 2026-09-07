@@ -47,8 +47,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # products.json, products.db の変更をステージング
-          git add products.json products.db
+          # products.json, products.db, crawl_history.json の変更をステージング
+          git add products.json products.db crawl_history.json
           
           if git diff --staged --quiet; then
             echo "No changes detected. Skipping commit."

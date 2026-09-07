@@ -6,7 +6,7 @@
 (function () {
   'use strict';
 
-  // Current Tab State: 'home' | 'search' | 'bookmarks'
+  // Current Tab State: 'home' | 'search' | 'bookmarks' | 'settings'
   let currentTab = 'home';
 
   // Filter / Query State
@@ -28,13 +28,16 @@
 
   // DOM Elements
   const htmlEl = document.documentElement;
-  const themeToggle = document.getElementById('themeToggle');
   const navTabs = document.querySelectorAll('.nav-item[data-tab]');
   const navBookmarkBadge = document.getElementById('navBookmarkBadge');
   const searchSection = document.getElementById('searchSection');
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearch');
   const controlsSection = document.getElementById('controlsSection');
+  const productsSection = document.getElementById('productsSection');
+  const settingsSection = document.getElementById('settingsSection');
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  const crawlHistoryContainer = document.getElementById('crawlHistoryContainer');
   const availableOnlyToggle = document.getElementById('availableOnlyToggle');
   const sortSelect = document.getElementById('sortSelect');
   const categoryChipsContainer = document.getElementById('categoryChips');
@@ -53,6 +56,7 @@
   const detailBackdrop = document.getElementById('detailBackdrop');
   const detailCloseBtn = document.getElementById('detailCloseBtn');
   const detailBookmarkBtn = document.getElementById('detailBookmarkBtn');
+  const detailSourceBtn = document.getElementById('detailSourceBtn');
   const detailIdBadge = document.getElementById('detailIdBadge');
   const detailMainImg = document.getElementById('detailMainImg');
   const detailPrevImg = document.getElementById('detailPrevImg');
@@ -65,7 +69,7 @@
   const detailDescText = document.getElementById('detailDescText');
 
   /* --------------------------------------------------------------------------
-     Theme Management (Light / Dark Mode)
+     Theme Management (Light / Dark Mode in Settings)
      -------------------------------------------------------------------------- */
   function initTheme() {
     const savedTheme = localStorage.getItem('theme');
@@ -73,15 +77,18 @@
     const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
     setTheme(initialTheme);
 
-    themeToggle.addEventListener('click', () => {
-      const currentTheme = htmlEl.getAttribute('data-theme');
-      const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      setTheme(nextTheme);
-    });
+    if (darkModeToggle) {
+      darkModeToggle.checked = initialTheme === 'dark';
+      darkModeToggle.addEventListener('change', (e) => {
+        setTheme(e.target.checked ? 'dark' : 'light');
+      });
+    }
 
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem('theme')) {
-        setTheme(e.matches ? 'dark' : 'light');
+        const next = e.matches ? 'dark' : 'light';
+        setTheme(next);
+        if (darkModeToggle) darkModeToggle.checked = e.matches;
       }
     });
   }
@@ -89,14 +96,13 @@
   function setTheme(theme) {
     htmlEl.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
-    const icon = themeToggle.querySelector('.theme-icon');
-    if (icon) {
-      icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
+    if (darkModeToggle) {
+      darkModeToggle.checked = theme === 'dark';
     }
   }
 
   /* --------------------------------------------------------------------------
-     Navigation Tabs ('home', 'search', 'bookmarks')
+     Navigation Tabs ('home', 'search', 'bookmarks', 'settings')
      -------------------------------------------------------------------------- */
   function switchTab(tabName) {
     currentTab = tabName;
@@ -104,21 +110,90 @@
       tab.classList.toggle('active', tab.dataset.tab === tabName);
     });
 
-    if (tabName === 'search') {
-      searchSection.style.display = 'block';
-      searchInput.focus();
-    } else if (tabName === 'bookmarks') {
-      searchSection.style.display = 'none';
+    if (tabName === 'home') {
+      searchSection.style.display = 'none'; // ホームに検索バーは不要
+      controlsSection.style.display = 'flex';
+      productsSection.style.display = 'block';
+      settingsSection.style.display = 'none';
       searchQuery = '';
       searchInput.value = '';
       clearSearchBtn.style.display = 'none';
-    } else { // 'home'
-      searchSection.style.display = 'block';
+    } else if (tabName === 'search') {
+      searchSection.style.display = 'block'; // 検索タブで表示
+      controlsSection.style.display = 'flex';
+      productsSection.style.display = 'block';
+      settingsSection.style.display = 'none';
+      searchInput.focus();
+    } else if (tabName === 'bookmarks') {
+      searchSection.style.display = 'none';
+      controlsSection.style.display = 'flex';
+      productsSection.style.display = 'block';
+      settingsSection.style.display = 'none';
+      searchQuery = '';
+      searchInput.value = '';
+      clearSearchBtn.style.display = 'none';
+    } else if (tabName === 'settings') {
+      searchSection.style.display = 'none';
+      controlsSection.style.display = 'none';
+      productsSection.style.display = 'none';
+      settingsSection.style.display = 'flex';
+      loadCrawlHistory(); // クローラー履歴の読み込み
     }
 
-    currentPage = 1;
-    applyFiltersAndSort();
+    if (tabName !== 'settings') {
+      currentPage = 1;
+      applyFiltersAndSort();
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* --------------------------------------------------------------------------
+     Crawler History (直近20件の表示)
+     -------------------------------------------------------------------------- */
+  async function loadCrawlHistory() {
+    if (!crawlHistoryContainer) return;
+    try {
+      const res = await fetch('crawl_history.json?' + new Date().getTime());
+      if (!res.ok) throw new Error('履歴なし');
+      const history = await res.json();
+      renderCrawlHistory(history);
+    } catch (err) {
+      crawlHistoryContainer.innerHTML = '<div class="history-loading">実行履歴はまだありません。</div>';
+    }
+  }
+
+  function renderCrawlHistory(history) {
+    if (!history || history.length === 0) {
+      crawlHistoryContainer.innerHTML = '<div class="history-loading">実行履歴はありません。</div>';
+      return;
+    }
+
+    crawlHistoryContainer.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
+    history.slice(0, 20).forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+
+      const minP = item.pages_crawled && item.pages_crawled.length ? Math.min(...item.pages_crawled) : '-';
+      const maxP = item.pages_crawled && item.pages_crawled.length ? Math.max(...item.pages_crawled) : '-';
+      const pagesStr = minP !== '-' ? `Page ${minP} 〜 ${maxP} (計 ${item.pages_crawled.length} ページ)` : '全ページ';
+
+      div.innerHTML = `
+        <div class="history-item-top">
+          <span class="history-time">${item.timestamp || '日時不明'}</span>
+          <span class="history-status">完了</span>
+        </div>
+        <div class="history-details">
+          <span>商品総数: <strong>${item.total_items ? item.total_items.toLocaleString() : 0} 件</strong></span>
+          <span>差分更新: <strong>${item.updated_count ? item.updated_count.toLocaleString() : 0} 件</strong></span>
+        </div>
+        <div class="history-pages">巡回対象: ${pagesStr}</div>
+      `;
+      fragment.appendChild(div);
+    });
+
+    crawlHistoryContainer.appendChild(fragment);
   }
 
   /* --------------------------------------------------------------------------
@@ -242,6 +317,8 @@
      Filtering & Sorting Logic
      -------------------------------------------------------------------------- */
   function applyFiltersAndSort() {
+    if (currentTab === 'settings') return;
+
     filteredProducts = allProducts.filter(item => {
       // 1. Tab filter (Bookmarks view)
       if (currentTab === 'bookmarks') {
@@ -258,7 +335,7 @@
         return false;
       }
 
-      // 4. Search Query (Home or Search view)
+      // 4. Search Query (Search tab only or if query exists)
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const idMatch = item.id && item.id.toLowerCase().includes(q);
@@ -350,7 +427,6 @@
     const isSoldOut = !item.is_available;
     const isBookmarked = bookmarks.has(item.id);
 
-    // 売り切れの場合はグレーアウト (soldoutクラス)
     card.className = `product-card ${isSoldOut ? 'soldout' : 'available'}`;
     card.dataset.id = item.id;
 
@@ -361,7 +437,7 @@
     const mediaDiv = document.createElement('div');
     mediaDiv.className = 'card-media';
 
-    // Main Image Box (SOLD OUT文字やスタンプは不要)
+    // Main Image Box
     const mainImgWrapper = document.createElement('div');
     mainImgWrapper.className = 'card-main-img-wrapper';
 
@@ -373,7 +449,7 @@
     mainImgWrapper.appendChild(mainImg);
     mediaDiv.appendChild(mainImgWrapper);
 
-    // Header Overlays (Only Three Dots Menu, NO page badge, NO status overlay badges)
+    // Header Overlays (Three Dots Menu only)
     const headerBar = document.createElement('div');
     headerBar.className = 'card-header-bar';
 
@@ -407,7 +483,19 @@
       toggleBookmark(item.id);
     });
 
-    // Menu Item 2: Copy ID
+    // Menu Item 2: Open Source Page (元ページに飛ぶ項目)
+    const sourceItem = document.createElement('button');
+    sourceItem.className = 'menu-item';
+    sourceItem.innerHTML = `<span class="material-symbols-outlined">open_in_new</span><span>元ページを開く</span>`;
+    sourceItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('show');
+      if (item.source_url) {
+        window.open(item.source_url, '_blank');
+      }
+    });
+
+    // Menu Item 3: Copy ID
     const copyItem = document.createElement('button');
     copyItem.className = 'menu-item';
     copyItem.innerHTML = `<span class="material-symbols-outlined">content_copy</span><span>管理番号をコピー</span>`;
@@ -419,7 +507,7 @@
       });
     });
 
-    // Menu Item 3: Open Details
+    // Menu Item 4: Open Details
     const detailItem = document.createElement('button');
     detailItem.className = 'menu-item';
     detailItem.innerHTML = `<span class="material-symbols-outlined">visibility</span><span>詳細を見る</span>`;
@@ -430,6 +518,7 @@
     });
 
     dropdown.appendChild(bmItem);
+    dropdown.appendChild(sourceItem);
     dropdown.appendChild(copyItem);
     dropdown.appendChild(detailItem);
 
@@ -461,7 +550,7 @@
         thumbImg.loading = 'lazy';
         thumbBtn.appendChild(thumbImg);
 
-        thumbBtn.addEventListener('mouseenter', (e) => {
+        thumbBtn.addEventListener('mouseenter', () => {
           mainImg.src = imgUrl;
           thumbsDiv.querySelectorAll('.card-thumb').forEach(t => t.classList.remove('active'));
           thumbBtn.classList.add('active');
@@ -512,7 +601,7 @@
     }
     priceRow.appendChild(priceDiv);
 
-    // 販売中の場合のみ card-status-label available を表示、売り切れ時は文字非表示
+    // 販売中のみ表示するラベル
     if (!isSoldOut) {
       const statusLabel = document.createElement('span');
       statusLabel.className = 'card-status-label available';
@@ -553,6 +642,13 @@
 
     // Bookmark button in modal
     updateModalBookmarkBtn();
+
+    // Source page button
+    if (detailSourceBtn) {
+      detailSourceBtn.onclick = () => {
+        if (item.source_url) window.open(item.source_url, '_blank');
+      };
+    }
 
     // Category & Title
     detailCategory.textContent = item.category ? `【${item.category}】` : '';
