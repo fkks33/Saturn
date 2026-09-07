@@ -26,6 +26,9 @@
   let activeModalItem = null;
   let activeModalImgIndex = 0;
 
+  // Guard to prevent card click when closing dropdown menu
+  let menuJustClosed = false;
+
   // DOM Elements
   const htmlEl = document.documentElement;
   const navTabs = document.querySelectorAll('.nav-item[data-tab]');
@@ -33,10 +36,16 @@
   const searchSection = document.getElementById('searchSection');
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearch');
+  const quickKeywords = document.getElementById('quickKeywords');
   const controlsSection = document.getElementById('controlsSection');
   const productsSection = document.getElementById('productsSection');
   const settingsSection = document.getElementById('settingsSection');
   const darkModeToggle = document.getElementById('darkModeToggle');
+  const refreshDataBtn = document.getElementById('refreshDataBtn');
+  const summaryTotal = document.getElementById('summaryTotal');
+  const summaryAvailable = document.getElementById('summaryAvailable');
+  const summarySoldOut = document.getElementById('summarySoldOut');
+  const summaryPages = document.getElementById('summaryPages');
   const crawlHistoryContainer = document.getElementById('crawlHistoryContainer');
   const availableOnlyToggle = document.getElementById('availableOnlyToggle');
   const sortSelect = document.getElementById('sortSelect');
@@ -123,7 +132,7 @@
       controlsSection.style.display = 'flex';
       productsSection.style.display = 'block';
       settingsSection.style.display = 'none';
-      searchInput.focus();
+      setTimeout(() => searchInput.focus(), 50);
     } else if (tabName === 'bookmarks') {
       searchSection.style.display = 'none';
       controlsSection.style.display = 'flex';
@@ -137,7 +146,8 @@
       controlsSection.style.display = 'none';
       productsSection.style.display = 'none';
       settingsSection.style.display = 'flex';
-      loadCrawlHistory(); // クローラー履歴の読み込み
+      updateDatabaseSummaryUI();
+      loadCrawlHistory();
     }
 
     if (tabName !== 'settings') {
@@ -148,8 +158,21 @@
   }
 
   /* --------------------------------------------------------------------------
-     Crawler History (直近20件の表示)
+     Database Summary & Crawler History
      -------------------------------------------------------------------------- */
+  function updateDatabaseSummaryUI() {
+    if (!summaryTotal) return;
+    const total = allProducts.length;
+    const avail = allProducts.filter(p => p.is_available).length;
+    const sold = total - avail;
+    const pages = new Set(allProducts.map(p => p.page).filter(Boolean)).size;
+
+    summaryTotal.textContent = total.toLocaleString() + ' 件';
+    summaryAvailable.textContent = avail.toLocaleString() + ' 件';
+    summarySoldOut.textContent = sold.toLocaleString() + ' 件';
+    summaryPages.textContent = pages + ' ページ';
+  }
+
   async function loadCrawlHistory() {
     if (!crawlHistoryContainer) return;
     try {
@@ -260,12 +283,13 @@
      -------------------------------------------------------------------------- */
   async function loadProducts() {
     try {
-      const res = await fetch('products.json');
+      const res = await fetch('products.json?' + new Date().getTime());
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       allProducts = await res.json();
       
       setupCategoryChips();
       applyFiltersAndSort();
+      updateDatabaseSummaryUI();
     } catch (err) {
       console.error('Failed to load products.json:', err);
       productCount.textContent = 'データの読み込みに失敗しました';
@@ -335,7 +359,7 @@
         return false;
       }
 
-      // 4. Search Query (Search tab only or if query exists)
+      // 4. Search Query
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const idMatch = item.id && item.id.toLowerCase().includes(q);
@@ -429,6 +453,9 @@
 
     card.className = `product-card ${isSoldOut ? 'soldout' : 'available'}`;
     card.dataset.id = item.id;
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', `${item.title || item.id} の詳細を表示`);
 
     const images = item.images && item.images.length > 0 ? item.images : [];
     const mainImgUrl = images[0] || '';
@@ -441,12 +468,21 @@
     const mainImgWrapper = document.createElement('div');
     mainImgWrapper.className = 'card-main-img-wrapper';
 
-    const mainImg = document.createElement('img');
-    mainImg.className = 'card-main-img';
-    mainImg.src = mainImgUrl;
-    mainImg.alt = item.title || item.id;
-    mainImg.loading = 'lazy';
-    mainImgWrapper.appendChild(mainImg);
+    if (mainImgUrl) {
+      const mainImg = document.createElement('img');
+      mainImg.className = 'card-main-img';
+      mainImg.src = mainImgUrl;
+      mainImg.alt = item.title || item.id;
+      mainImg.loading = 'lazy';
+      mainImgWrapper.appendChild(mainImg);
+    } else {
+      mainImgWrapper.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;height:100%;">
+          <span class="material-symbols-outlined" style="font-size:36px;">image_not_supported</span>
+          <span style="font-size:11px;margin-top:4px;">NO IMAGE</span>
+        </div>
+      `;
+    }
     mediaDiv.appendChild(mainImgWrapper);
 
     // Header Overlays (Three Dots Menu only)
@@ -483,7 +519,7 @@
       toggleBookmark(item.id);
     });
 
-    // Menu Item 2: Open Source Page (元ページに飛ぶ項目)
+    // Menu Item 2: Open Source Page (元ページを開く)
     const sourceItem = document.createElement('button');
     sourceItem.className = 'menu-item';
     sourceItem.innerHTML = `<span class="material-symbols-outlined">open_in_new</span><span>元ページを開く</span>`;
@@ -550,11 +586,16 @@
         thumbImg.loading = 'lazy';
         thumbBtn.appendChild(thumbImg);
 
-        thumbBtn.addEventListener('mouseenter', () => {
-          mainImg.src = imgUrl;
+        const switchMainImg = (e) => {
+          if (e) e.stopPropagation();
+          const curMain = mainImgWrapper.querySelector('.card-main-img');
+          if (curMain) curMain.src = imgUrl;
           thumbsDiv.querySelectorAll('.card-thumb').forEach(t => t.classList.remove('active'));
           thumbBtn.classList.add('active');
-        });
+        };
+
+        thumbBtn.addEventListener('mouseenter', switchMainImg);
+        thumbBtn.addEventListener('click', switchMainImg);
 
         thumbsDiv.appendChild(thumbBtn);
       });
@@ -612,16 +653,32 @@
     contentDiv.appendChild(priceRow);
     card.appendChild(contentDiv);
 
-    // Clicking anywhere on card opens Detail Popup Modal
-    card.addEventListener('click', () => {
+    // Card Click Handler (メニュー閉じた直後は発火しないガード付き)
+    const handleCardClick = () => {
+      if (menuJustClosed) return;
       openDetailModal(item);
+    };
+
+    card.addEventListener('click', handleCardClick);
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleCardClick();
+      }
     });
 
     return card;
   }
 
   function closeAllCardMenus() {
-    document.querySelectorAll('.card-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+    const openMenus = document.querySelectorAll('.card-dropdown-menu.show');
+    if (openMenus.length > 0) {
+      openMenus.forEach(m => m.classList.remove('show'));
+      menuJustClosed = true;
+      setTimeout(() => {
+        menuJustClosed = false;
+      }, 100);
+    }
   }
 
   document.addEventListener('click', (e) => {
@@ -758,7 +815,7 @@
       });
     });
 
-    // Search
+    // Search Input
     let debounceTimer;
     searchInput.addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
@@ -767,7 +824,7 @@
       debounceTimer = setTimeout(() => {
         currentPage = 1;
         applyFiltersAndSort();
-      }, 200);
+      }, 180);
     });
 
     clearSearchBtn.addEventListener('click', () => {
@@ -778,6 +835,30 @@
       applyFiltersAndSort();
       searchInput.focus();
     });
+
+    // Quick Keywords (人気検索チップ)
+    if (quickKeywords) {
+      quickKeywords.addEventListener('click', (e) => {
+        const chip = e.target.closest('.quick-chip');
+        if (!chip) return;
+        const query = chip.dataset.query;
+        searchInput.value = query;
+        searchQuery = query;
+        clearSearchBtn.style.display = 'flex';
+        currentPage = 1;
+        applyFiltersAndSort();
+      });
+    }
+
+    // Refresh Data in Settings
+    if (refreshDataBtn) {
+      refreshDataBtn.addEventListener('click', () => {
+        showToast('最新データを再読み込みしています...');
+        loadProducts().then(() => {
+          showToast('データを再読み込みしました');
+        });
+      });
+    }
 
     // Available Only Toggle
     availableOnlyToggle.addEventListener('change', (e) => {

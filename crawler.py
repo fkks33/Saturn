@@ -158,22 +158,37 @@ def parse_mini_page(page_num: int, download_images: bool = True) -> list[dict]:
         next_r_idx = id_row_indices[i + 1] if i + 1 < len(id_row_indices) else len(rows)
         block_rows = rows[r_idx:next_r_idx]
 
-        # 構造の想定: 0=ID, 1=Img1, 2=Img2, 3=Desc, 4=Price
-        r_img1 = block_rows[1] if len(block_rows) > 1 else None
-        r_img2 = block_rows[2] if len(block_rows) > 2 else None
-        r_desc = block_rows[3] if len(block_rows) > 3 else None
-        r_price = block_rows[4] if len(block_rows) > 4 else None
-
         id_cells = r_id.find_all(["td", "th"])
-        desc_cells = r_desc.find_all(["td", "th"]) if r_desc else []
-        price_cells = r_price.find_all(["td", "th"]) if r_price else []
 
-        # このブロック内のすべての画像タグ
+        # ブロック内の行を内容に基づいて動的に特定（画像行数や空行の揺れを完全吸収）
+        price_row = None
+        desc_row = None
+        img_rows = []
+
+        # 末尾行から逆順走査して価格行・説明文行を特定
+        remaining_rows = block_rows[1:]
+        for row in reversed(remaining_rows):
+            txt = row.get_text().strip()
+            # 1. 価格行の判定（￥, ¥, 円, 税込, SOLDOUT, 売約済 等）
+            if not price_row and (re.search(r'[￥¥\d,]+円?', txt) or any(k in txt.upper().replace(" ", "") for k in ['SOLDOUT', 'SOLD_OUT', '売約済', '予約済', '商談中', '税込'])):
+                price_row = row
+                continue
+            # 2. 説明文行の判定（価格行の直前にある文字テキスト行、または【, 「を含む行）
+            if price_row and not desc_row:
+                if len(txt) >= 2 or '【' in txt or '「' in txt:
+                    desc_row = row
+                    continue
+            # 3. 画像タグを含む行は画像行として収集
+            if row.find("img"):
+                img_rows.append(row)
+
+        desc_cells = desc_row.find_all(["td", "th"]) if desc_row else []
+        price_cells = price_row.find_all(["td", "th"]) if price_row else []
+
+        # このブロック内のすべての画像タグからsrcを収集
         all_imgs = []
-        if r_img1:
-            all_imgs.extend([img.get("src") for img in r_img1.find_all("img") if img.get("src")])
-        if r_img2:
-            all_imgs.extend([img.get("src") for img in r_img2.find_all("img") if img.get("src")])
+        for r_img in img_rows:
+            all_imgs.extend([img.get("src") for img in r_img.find_all("img") if img.get("src")])
 
         for col_idx, id_cell in enumerate(id_cells):
             raw_id_text = id_cell.get_text(strip=True)
@@ -192,6 +207,19 @@ def parse_mini_page(page_num: int, download_images: bool = True) -> list[dict]:
                     abs_url = urljoin(BASE_URL, src)
                     if abs_url not in remote_img_urls:
                         remote_img_urls.append(abs_url)
+
+            # フォールバック: 元サイトでファイル名番号がズレている場合、同列位置の画像を救済
+            if not remote_img_urls and img_rows:
+                for r_img in img_rows:
+                    img_cells = r_img.find_all(["td", "th"])
+                    if col_idx < len(img_cells):
+                        cell_imgs = img_cells[col_idx].find_all("img")
+                        for img in cell_imgs:
+                            src = img.get("src")
+                            if src:
+                                abs_url = urljoin(BASE_URL, src)
+                                if abs_url not in remote_img_urls:
+                                    remote_img_urls.append(abs_url)
 
             # 説明文
             cleaned_desc = ""

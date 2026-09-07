@@ -65,6 +65,16 @@
               <span class="material-symbols-outlined">close</span>
             </button>
           </div>
+          <!-- Quick Search Keywords -->
+          <div class="quick-keywords" id="quickKeywords">
+            <span class="quick-keywords-label">人気検索:</span>
+            <button class="quick-chip" data-query="腕時計">腕時計</button>
+            <button class="quick-chip" data-query="記念乗車券">記念乗車券</button>
+            <button class="quick-chip" data-query="書籍">書籍</button>
+            <button class="quick-chip" data-query="運転スタフ">運転スタフ</button>
+            <button class="quick-chip" data-query="サボ">サボ</button>
+            <button class="quick-chip" data-query="腕章">腕章</button>
+          </div>
         </section>
 
         <!-- Controls Section (Filters & Sort: ホーム・検索・ブックマーク時に表示) -->
@@ -126,6 +136,35 @@
 
         <!-- Settings Section (設定タブ時に表示) -->
         <section class="settings-section" id="settingsSection" style="display: none;">
+          <!-- Database Summary Card -->
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <h3 class="settings-card-title">データベース概要</h3>
+              <button id="refreshDataBtn" class="refresh-btn" title="最新データを再読み込み">
+                <span class="material-symbols-outlined" style="font-size: 18px;">refresh</span>
+                <span>再読み込み</span>
+              </button>
+            </div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <span class="summary-label">総商品数</span>
+                <strong class="summary-val" id="summaryTotal">-</strong>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">販売中</span>
+                <strong class="summary-val" id="summaryAvailable">-</strong>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">売り切れ</span>
+                <strong class="summary-val" id="summarySoldOut">-</strong>
+              </div>
+              <div class="summary-item">
+                <span class="summary-label">巡回ページ数</span>
+                <strong class="summary-val" id="summaryPages">-</strong>
+              </div>
+            </div>
+          </div>
+
           <!-- Appearance Card -->
           <div class="settings-card">
             <h3 class="settings-card-title">外観設定</h3>
