@@ -6,13 +6,15 @@
 (function () {
   'use strict';
 
-  // State
+  // Current Tab State: 'home' | 'search' | 'bookmarks'
+  let currentTab = 'home';
+
+  // Filter / Query State
   let allProducts = [];
   let filteredProducts = [];
   let currentCategory = 'all';
   let searchQuery = '';
   let availableOnly = false;
-  let showBookmarksOnly = false;
   let currentSort = 'newest'; // 案B: 新着順（デフォルト）
   let currentPage = 1;
   const ITEMS_PER_PAGE = 24;
@@ -27,11 +29,13 @@
   // DOM Elements
   const htmlEl = document.documentElement;
   const themeToggle = document.getElementById('themeToggle');
+  const navTabs = document.querySelectorAll('.nav-item[data-tab]');
+  const navBookmarkBadge = document.getElementById('navBookmarkBadge');
+  const searchSection = document.getElementById('searchSection');
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearch');
+  const controlsSection = document.getElementById('controlsSection');
   const availableOnlyToggle = document.getElementById('availableOnlyToggle');
-  const bookmarkFilterBtn = document.getElementById('bookmarkFilterBtn');
-  const bookmarkCountSpan = document.getElementById('bookmarkCount');
   const sortSelect = document.getElementById('sortSelect');
   const categoryChipsContainer = document.getElementById('categoryChips');
   const productGrid = document.getElementById('productGrid');
@@ -49,9 +53,7 @@
   const detailBackdrop = document.getElementById('detailBackdrop');
   const detailCloseBtn = document.getElementById('detailCloseBtn');
   const detailBookmarkBtn = document.getElementById('detailBookmarkBtn');
-  const detailStatusBadge = document.getElementById('detailStatusBadge');
   const detailIdBadge = document.getElementById('detailIdBadge');
-  const detailPageBadge = document.getElementById('detailPageBadge');
   const detailMainImg = document.getElementById('detailMainImg');
   const detailPrevImg = document.getElementById('detailPrevImg');
   const detailNextImg = document.getElementById('detailNextImg');
@@ -61,8 +63,6 @@
   const detailTitle = document.getElementById('detailTitle');
   const detailPriceBox = document.getElementById('detailPriceBox');
   const detailDescText = document.getElementById('detailDescText');
-  const detailContactId = document.getElementById('detailContactId');
-  const copyIdBtn = document.getElementById('copyIdBtn');
 
   /* --------------------------------------------------------------------------
      Theme Management (Light / Dark Mode)
@@ -93,6 +93,32 @@
     if (icon) {
       icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
     }
+  }
+
+  /* --------------------------------------------------------------------------
+     Navigation Tabs ('home', 'search', 'bookmarks')
+     -------------------------------------------------------------------------- */
+  function switchTab(tabName) {
+    currentTab = tabName;
+    navTabs.forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    if (tabName === 'search') {
+      searchSection.style.display = 'block';
+      searchInput.focus();
+    } else if (tabName === 'bookmarks') {
+      searchSection.style.display = 'none';
+      searchQuery = '';
+      searchInput.value = '';
+      clearSearchBtn.style.display = 'none';
+    } else { // 'home'
+      searchSection.style.display = 'block';
+    }
+
+    currentPage = 1;
+    applyFiltersAndSort();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   /* --------------------------------------------------------------------------
@@ -131,8 +157,13 @@
   }
 
   function updateBookmarkCountUI() {
-    if (bookmarkCountSpan) {
-      bookmarkCountSpan.textContent = bookmarks.size;
+    if (navBookmarkBadge) {
+      if (bookmarks.size > 0) {
+        navBookmarkBadge.textContent = bookmarks.size;
+        navBookmarkBadge.style.display = 'inline-block';
+      } else {
+        navBookmarkBadge.style.display = 'none';
+      }
     }
   }
 
@@ -212,19 +243,22 @@
      -------------------------------------------------------------------------- */
   function applyFiltersAndSort() {
     filteredProducts = allProducts.filter(item => {
-      // Bookmarks only filter
-      if (showBookmarksOnly && !bookmarks.has(item.id)) {
-        return false;
+      // 1. Tab filter (Bookmarks view)
+      if (currentTab === 'bookmarks') {
+        if (!bookmarks.has(item.id)) return false;
       }
-      // Category
+
+      // 2. Category
       if (currentCategory !== 'all' && item.category !== currentCategory) {
         return false;
       }
-      // Available Only
+
+      // 3. Available Only
       if (availableOnly && !item.is_available) {
         return false;
       }
-      // Search Query
+
+      // 4. Search Query (Home or Search view)
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const idMatch = item.id && item.id.toLowerCase().includes(q);
@@ -266,7 +300,8 @@
     });
 
     // Status text
-    productCount.textContent = `表示中: ${filteredProducts.length} 件 (全 ${allProducts.length} 件)`;
+    const tabLabel = currentTab === 'bookmarks' ? 'ブックマーク' : (currentTab === 'search' ? '検索結果' : '全商品');
+    productCount.textContent = `${tabLabel}: ${filteredProducts.length} 件 (全 ${allProducts.length} 件)`;
 
     renderProducts();
   }
@@ -276,15 +311,13 @@
      -------------------------------------------------------------------------- */
   function renderProducts() {
     productGrid.innerHTML = '';
-
-    // Close any open card menus when re-rendering
     closeAllCardMenus();
 
     if (filteredProducts.length === 0) {
       emptyState.style.display = 'block';
-      if (showBookmarksOnly) {
+      if (currentTab === 'bookmarks') {
         emptyTitle.textContent = 'ブックマークされた商品がありません';
-        emptyDesc.textContent = '商品カードのメニュー（︙）からブックマークに追加できます。';
+        emptyDesc.textContent = '商品カード右上のメニュー（︙）からブックマークに追加できます。';
       } else {
         emptyTitle.textContent = '該当する商品が見つかりませんでした';
         emptyDesc.textContent = '検索条件やカテゴリを変更してお試しください。';
@@ -317,6 +350,7 @@
     const isSoldOut = !item.is_available;
     const isBookmarked = bookmarks.has(item.id);
 
+    // 売り切れの場合はグレーアウト (soldoutクラス)
     card.className = `product-card ${isSoldOut ? 'soldout' : 'available'}`;
     card.dataset.id = item.id;
 
@@ -327,7 +361,7 @@
     const mediaDiv = document.createElement('div');
     mediaDiv.className = 'card-media';
 
-    // Main Image Box
+    // Main Image Box (SOLD OUT文字やスタンプは不要)
     const mainImgWrapper = document.createElement('div');
     mainImgWrapper.className = 'card-main-img-wrapper';
 
@@ -337,39 +371,12 @@
     mainImg.alt = item.title || item.id;
     mainImg.loading = 'lazy';
     mainImgWrapper.appendChild(mainImg);
-
-    // SOLD OUT Large Stamp Overlay if unavailable
-    if (isSoldOut) {
-      const soldBanner = document.createElement('div');
-      soldBanner.className = 'soldout-overlay-banner';
-      soldBanner.innerHTML = `<span class="soldout-stamp">SOLD OUT</span>`;
-      mainImgWrapper.appendChild(soldBanner);
-    }
-
     mediaDiv.appendChild(mainImgWrapper);
 
-    // Header Overlays (Badges & Three Dots Menu)
+    // Header Overlays (Only Three Dots Menu, NO page badge, NO status overlay badges)
     const headerBar = document.createElement('div');
     headerBar.className = 'card-header-bar';
 
-    // Left Badges
-    const leftBadges = document.createElement('div');
-    leftBadges.className = 'card-left-badges';
-
-    const statusBadge = document.createElement('span');
-    statusBadge.className = `badge ${isSoldOut ? 'badge-soldout' : 'badge-available'}`;
-    statusBadge.textContent = isSoldOut ? '売り切れ' : '● 販売中';
-    leftBadges.appendChild(statusBadge);
-
-    if (item.page) {
-      const pageBadge = document.createElement('span');
-      pageBadge.className = 'badge badge-page';
-      pageBadge.textContent = `P.${item.page}`;
-      leftBadges.appendChild(pageBadge);
-    }
-    headerBar.appendChild(leftBadges);
-
-    // Right Action Box (Three Dots & Dropdown Menu)
     const actionBox = document.createElement('div');
     actionBox.className = 'card-action-box';
 
@@ -503,15 +510,17 @@
     } else {
       priceDiv.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
     }
-
-    const statusLabel = document.createElement('span');
-    statusLabel.className = `card-status-label ${isSoldOut ? 'soldout' : 'available'}`;
-    statusLabel.textContent = isSoldOut ? 'SOLD OUT' : '販売中';
-
     priceRow.appendChild(priceDiv);
-    priceRow.appendChild(statusLabel);
-    contentDiv.appendChild(priceRow);
 
+    // 販売中の場合のみ card-status-label available を表示、売り切れ時は文字非表示
+    if (!isSoldOut) {
+      const statusLabel = document.createElement('span');
+      statusLabel.className = 'card-status-label available';
+      statusLabel.textContent = '販売中';
+      priceRow.appendChild(statusLabel);
+    }
+
+    contentDiv.appendChild(priceRow);
     card.appendChild(contentDiv);
 
     // Clicking anywhere on card opens Detail Popup Modal
@@ -533,20 +542,14 @@
   });
 
   /* --------------------------------------------------------------------------
-     Product Detail Modal (ポップアップダイアログ & 画像拡大)
+     Product Detail Modal (ポップアップダイアログ)
      -------------------------------------------------------------------------- */
   function openDetailModal(item) {
     activeModalItem = item;
     activeModalImgIndex = 0;
 
-    const isSoldOut = !item.is_available;
-    const isBookmarked = bookmarks.has(item.id);
-
     // Header Badges
-    detailStatusBadge.className = `badge ${isSoldOut ? 'badge-soldout' : 'badge-available'}`;
-    detailStatusBadge.textContent = isSoldOut ? 'SOLD OUT' : '● 販売中';
     detailIdBadge.textContent = item.id;
-    detailPageBadge.textContent = item.page ? `掲載: P.${item.page}` : '';
 
     // Bookmark button in modal
     updateModalBookmarkBtn();
@@ -557,16 +560,17 @@
 
     // Price
     if (item.price) {
-      detailPriceBox.innerHTML = `<span class="detail-price-val">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
+      detailPriceBox.innerHTML = `
+        <span class="detail-price-val ${!item.is_available ? 'soldout' : ''}">¥${item.price.toLocaleString()}</span>
+        <span class="card-price-unit">(税込)</span>
+        ${item.is_available ? '<span class="card-status-label available" style="margin-left:8px;">販売中</span>' : ''}
+      `;
     } else {
       detailPriceBox.innerHTML = `<span class="detail-price-val">${item.price_raw || '要問合せ'}</span>`;
     }
 
     // Description
     detailDescText.textContent = item.description || '説明文はありません。';
-
-    // Contact
-    detailContactId.textContent = item.id;
 
     // Setup Gallery
     const images = item.images && item.images.length > 0 ? item.images : [];
@@ -635,7 +639,6 @@
     detailMainImg.src = images[activeModalImgIndex];
     detailImgCounter.textContent = `${activeModalImgIndex + 1} / ${images.length}`;
 
-    // Update active thumb
     detailThumbs.querySelectorAll('.detail-thumb-btn').forEach((b, idx) => {
       b.classList.toggle('active', idx === activeModalImgIndex);
     });
@@ -652,6 +655,13 @@
      Event Listeners
      -------------------------------------------------------------------------- */
   function setupEventListeners() {
+    // Navigation Tab Switching
+    navTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        switchTab(tab.dataset.tab);
+      });
+    });
+
     // Search
     let debounceTimer;
     searchInput.addEventListener('input', (e) => {
@@ -661,7 +671,7 @@
       debounceTimer = setTimeout(() => {
         currentPage = 1;
         applyFiltersAndSort();
-      }, 250);
+      }, 200);
     });
 
     clearSearchBtn.addEventListener('click', () => {
@@ -680,14 +690,6 @@
       applyFiltersAndSort();
     });
 
-    // Bookmark Filter Button
-    bookmarkFilterBtn.addEventListener('click', () => {
-      showBookmarksOnly = !showBookmarksOnly;
-      bookmarkFilterBtn.classList.toggle('active', showBookmarksOnly);
-      currentPage = 1;
-      applyFiltersAndSort();
-    });
-
     // Sort Select
     sortSelect.addEventListener('change', (e) => {
       currentSort = e.target.value;
@@ -702,8 +704,6 @@
       clearSearchBtn.style.display = 'none';
       availableOnlyToggle.checked = false;
       availableOnly = false;
-      showBookmarksOnly = false;
-      bookmarkFilterBtn.classList.remove('active');
       sortSelect.value = 'newest';
       currentSort = 'newest';
       currentCategory = 'all';
@@ -741,14 +741,6 @@
       if (!activeModalItem || !activeModalItem.images.length) return;
       activeModalImgIndex = (activeModalImgIndex + 1) % activeModalItem.images.length;
       updateModalMainImg();
-    });
-
-    copyIdBtn.addEventListener('click', () => {
-      if (activeModalItem) {
-        navigator.clipboard.writeText(activeModalItem.id).then(() => {
-          showToast(`管理番号「${activeModalItem.id}」をコピーしました`);
-        });
-      }
     });
 
     // Keyboard navigation

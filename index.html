@@ -14,96 +14,124 @@
 </head>
 <body>
 
-  <!-- Top App Bar ("テスト" のみ) -->
-  <header class="app-bar">
-    <div class="app-bar-content">
-      <h1 class="brand-title">テスト</h1>
-      <div class="app-bar-actions">
-        <button id="themeToggle" class="icon-button" aria-label="テーマ切り替え" title="ライト/ダークモード切替">
-          <span class="material-symbols-outlined theme-icon">dark_mode</span>
+  <!-- App Layout Container (PC: Side Navigation Rail + Content, Mobile: Content + Bottom Navigation) -->
+  <div class="app-layout">
+
+    <!-- Navigation (PC: Rail / Mobile: Bottom Bar) -->
+    <nav class="app-navigation" aria-label="メインナビゲーション">
+      <div class="nav-items-group">
+        <button class="nav-item active" data-tab="home" id="tabHome">
+          <span class="material-symbols-outlined nav-icon">home</span>
+          <span class="nav-label">ホーム</span>
         </button>
-      </div>
-    </div>
-  </header>
 
-  <!-- Main Container -->
-  <main class="main-container">
+        <button class="nav-item" data-tab="search" id="tabSearch">
+          <span class="material-symbols-outlined nav-icon">search</span>
+          <span class="nav-label">検索</span>
+        </button>
 
-    <!-- Search & Filter Controls -->
-    <section class="controls-section">
-      <!-- Search Box -->
-      <div class="search-box">
-        <span class="material-symbols-outlined search-icon">search</span>
-        <input type="text" id="searchInput" placeholder="商品名、管理番号、キーワードで検索..." autocomplete="off">
-        <button id="clearSearch" class="clear-btn" aria-label="クリア" style="display: none;">
-          <span class="material-symbols-outlined">close</span>
+        <button class="nav-item" data-tab="bookmarks" id="tabBookmarks">
+          <span class="material-symbols-outlined nav-icon">bookmark</span>
+          <span class="nav-label">ブックマーク</span>
+          <span class="nav-badge" id="navBookmarkBadge" style="display: none;">0</span>
         </button>
       </div>
 
-      <!-- Controls Row: Availability, Bookmark, & Sort -->
-      <div class="controls-row">
-        <div class="switches-group">
-          <!-- Availability Toggle -->
-          <label class="switch-control">
-            <input type="checkbox" id="availableOnlyToggle">
-            <span class="slider"></span>
-            <span class="switch-label">販売中のみ</span>
-          </label>
-
-          <!-- Bookmarks Filter Toggle -->
-          <button id="bookmarkFilterBtn" class="bookmark-filter-btn" title="ブックマークした商品のみ表示">
-            <span class="material-symbols-outlined bookmark-btn-icon">bookmark</span>
-            <span>ブックマーク (<span id="bookmarkCount">0</span>)</span>
-          </button>
-        </div>
-
-        <!-- Sort Select -->
-        <div class="sort-wrapper">
-          <label for="sortSelect" class="sort-label">並び順:</label>
-          <div class="select-container">
-            <select id="sortSelect">
-              <option value="newest" selected>新着順（最新入荷順）</option>
-              <option value="available_first">販売中優先 ＋ 新着順</option>
-              <option value="price_asc">価格の安い順</option>
-              <option value="price_desc">価格の高い順</option>
-              <option value="id_asc">管理番号 昇順</option>
-            </select>
-            <span class="material-symbols-outlined select-arrow">arrow_drop_down</span>
-          </div>
-        </div>
+      <!-- Theme Toggle SW inside Navigation -->
+      <div class="nav-theme-group">
+        <button id="themeToggle" class="nav-item theme-nav-item" aria-label="テーマ切り替え" title="ライト/ダークモード切替">
+          <span class="material-symbols-outlined nav-icon theme-icon">dark_mode</span>
+          <span class="nav-label">テーマ</span>
+        </button>
       </div>
+    </nav>
 
-      <!-- Category Filter Chips -->
-      <div class="category-chips" id="categoryChips">
-        <button class="chip active" data-category="all">すべて</button>
-      </div>
-
-      <!-- Status Bar (Count & Active Filters) -->
-      <div class="status-bar">
-        <span id="productCount" class="count-text">読み込み中...</span>
-      </div>
-    </section>
-
-    <!-- Product Grid -->
-    <section class="products-section">
-      <div id="productGrid" class="product-grid">
-        <!-- Product Cards injected by JS -->
-      </div>
+    <!-- Main Content Area -->
+    <div class="content-wrapper">
       
-      <!-- Empty State -->
-      <div id="emptyState" class="empty-state" style="display: none;">
-        <span class="material-symbols-outlined empty-icon">search_off</span>
-        <h3 id="emptyTitle">該当する商品が見つかりませんでした</h3>
-        <p id="emptyDesc">検索条件やカテゴリを変更してお試しください。</p>
-        <button id="resetFiltersBtn" class="filled-button">条件をリセット</button>
-      </div>
+      <!-- Top App Bar ("テスト" のみ) -->
+      <header class="app-bar">
+        <div class="app-bar-content">
+          <h1 class="brand-title">テスト</h1>
+        </div>
+      </header>
 
-      <!-- Load More / Pagination -->
-      <div class="pagination-wrapper" id="paginationWrapper" style="display: none;">
-        <button id="loadMoreBtn" class="outlined-button">さらに表示する</button>
-      </div>
-    </section>
-  </main>
+      <!-- Main Container -->
+      <main class="main-container">
+
+        <!-- Search View Section (検索タブ時に大きく強調、ホーム時もクイック検索可能) -->
+        <section class="search-section" id="searchSection">
+          <div class="search-box">
+            <span class="material-symbols-outlined search-icon">search</span>
+            <input type="text" id="searchInput" placeholder="商品名、管理番号、キーワードで検索..." autocomplete="off">
+            <button id="clearSearch" class="clear-btn" aria-label="クリア" style="display: none;">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Controls Section (Filters & Sort) -->
+        <section class="controls-section" id="controlsSection">
+          <div class="controls-row">
+            <!-- Availability Toggle -->
+            <label class="switch-control">
+              <input type="checkbox" id="availableOnlyToggle">
+              <span class="slider"></span>
+              <span class="switch-label">販売中のみ</span>
+            </label>
+
+            <!-- Sort Select -->
+            <div class="sort-wrapper">
+              <label for="sortSelect" class="sort-label">並び順:</label>
+              <div class="select-container">
+                <select id="sortSelect">
+                  <option value="newest" selected>新着順（最新入荷順）</option>
+                  <option value="available_first">販売中優先 ＋ 新着順</option>
+                  <option value="price_asc">価格の安い順</option>
+                  <option value="price_desc">価格の高い順</option>
+                  <option value="id_asc">管理番号 昇順</option>
+                </select>
+                <span class="material-symbols-outlined select-arrow">arrow_drop_down</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Category Filter Chips -->
+          <div class="category-chips" id="categoryChips">
+            <button class="chip active" data-category="all">すべて</button>
+          </div>
+
+          <!-- Status Bar (Count) -->
+          <div class="status-bar">
+            <span id="productCount" class="count-text">読み込み中...</span>
+          </div>
+        </section>
+
+        <!-- Product Grid Section -->
+        <section class="products-section">
+          <div id="productGrid" class="product-grid">
+            <!-- Injected by JS -->
+          </div>
+          
+          <!-- Empty State -->
+          <div id="emptyState" class="empty-state" style="display: none;">
+            <span class="material-symbols-outlined empty-icon">search_off</span>
+            <h3 id="emptyTitle">該当する商品が見つかりませんでした</h3>
+            <p id="emptyDesc">検索条件やカテゴリを変更してお試しください。</p>
+            <button id="resetFiltersBtn" class="filled-button">条件をリセット</button>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-wrapper" id="paginationWrapper" style="display: none;">
+            <button id="loadMoreBtn" class="outlined-button">さらに表示する</button>
+          </div>
+        </section>
+      </main>
+
+      <!-- Footer (footer-content なし) -->
+      <footer class="app-footer"></footer>
+    </div>
+  </div>
 
   <!-- Product Detail Modal (ポップアップ詳細ダイアログ) -->
   <div id="detailModal" class="modal" aria-hidden="true">
@@ -111,9 +139,7 @@
     <div class="modal-dialog detail-dialog">
       <div class="detail-modal-header">
         <div class="detail-header-badges">
-          <span id="detailStatusBadge" class="badge"></span>
           <span id="detailIdBadge" class="card-id"></span>
-          <span id="detailPageBadge" class="badge badge-page"></span>
         </div>
         <div class="detail-header-actions">
           <button id="detailBookmarkBtn" class="icon-button small" title="ブックマークに追加/解除">
@@ -126,7 +152,7 @@
       </div>
 
       <div class="detail-modal-body">
-        <!-- Image Gallery Area (拡大表示) -->
+        <!-- Image Gallery Area -->
         <div class="detail-gallery">
           <div class="detail-main-img-box">
             <img id="detailMainImg" src="" alt="商品画像" class="detail-main-img">
@@ -151,19 +177,6 @@
             <h4 class="section-heading">商品説明</h4>
             <div class="detail-desc-text" id="detailDescText"></div>
           </div>
-
-          <div class="detail-contact-box">
-            <div class="contact-header">
-              <span class="material-symbols-outlined">call</span>
-              <strong>ご注文・お問い合わせ</strong>
-            </div>
-            <p class="contact-phone">TEL・FAX: <strong>075-365-8128</strong>（11:00〜18:00）</p>
-            <p class="contact-hint">※お問い合わせの際は、管理番号「<strong id="detailContactId"></strong>」をお伝えください。</p>
-            <button id="copyIdBtn" class="outlined-button small-btn">
-              <span class="material-symbols-outlined">content_copy</span>
-              <span>管理番号をコピー</span>
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -171,14 +184,6 @@
 
   <!-- Toast Notification -->
   <div id="toast" class="toast"></div>
-
-  <!-- Footer -->
-  <footer class="app-footer">
-    <div class="footer-content">
-      <p class="footer-note">※掲載情報は元サイトの入荷速報に基づき自動同期されています。</p>
-      <p class="footer-copy">&copy; 2026 Karamatsu Train Kyoto Store Catalog</p>
-    </div>
-  </footer>
 
   <script src="app.js"></script>
 </body>
