@@ -12,13 +12,17 @@
   let currentCategory = 'all';
   let searchQuery = '';
   let availableOnly = false;
+  let showBookmarksOnly = false;
   let currentSort = 'newest'; // 案B: 新着順（デフォルト）
   let currentPage = 1;
   const ITEMS_PER_PAGE = 24;
 
-  // Lightbox Modal State
-  let currentModalImages = [];
-  let currentModalIndex = 0;
+  // Bookmarks (Set of product IDs stored in localStorage)
+  let bookmarks = new Set();
+
+  // Active Detail Modal State
+  let activeModalItem = null;
+  let activeModalImgIndex = 0;
 
   // DOM Elements
   const htmlEl = document.documentElement;
@@ -26,24 +30,39 @@
   const searchInput = document.getElementById('searchInput');
   const clearSearchBtn = document.getElementById('clearSearch');
   const availableOnlyToggle = document.getElementById('availableOnlyToggle');
+  const bookmarkFilterBtn = document.getElementById('bookmarkFilterBtn');
+  const bookmarkCountSpan = document.getElementById('bookmarkCount');
   const sortSelect = document.getElementById('sortSelect');
   const categoryChipsContainer = document.getElementById('categoryChips');
   const productGrid = document.getElementById('productGrid');
   const productCount = document.getElementById('productCount');
   const emptyState = document.getElementById('emptyState');
+  const emptyTitle = document.getElementById('emptyTitle');
+  const emptyDesc = document.getElementById('emptyDesc');
   const resetFiltersBtn = document.getElementById('resetFiltersBtn');
   const paginationWrapper = document.getElementById('paginationWrapper');
   const loadMoreBtn = document.getElementById('loadMoreBtn');
+  const toastEl = document.getElementById('toast');
 
-  // Modal Elements
-  const imageModal = document.getElementById('imageModal');
-  const modalBackdrop = document.getElementById('modalBackdrop');
-  const modalClose = document.getElementById('modalClose');
-  const modalImg = document.getElementById('modalImg');
-  const modalPrev = document.getElementById('modalPrev');
-  const modalNext = document.getElementById('modalNext');
-  const modalCaption = document.getElementById('modalCaption');
-  const modalCounter = document.getElementById('modalCounter');
+  // Detail Modal Elements
+  const detailModal = document.getElementById('detailModal');
+  const detailBackdrop = document.getElementById('detailBackdrop');
+  const detailCloseBtn = document.getElementById('detailCloseBtn');
+  const detailBookmarkBtn = document.getElementById('detailBookmarkBtn');
+  const detailStatusBadge = document.getElementById('detailStatusBadge');
+  const detailIdBadge = document.getElementById('detailIdBadge');
+  const detailPageBadge = document.getElementById('detailPageBadge');
+  const detailMainImg = document.getElementById('detailMainImg');
+  const detailPrevImg = document.getElementById('detailPrevImg');
+  const detailNextImg = document.getElementById('detailNextImg');
+  const detailImgCounter = document.getElementById('detailImgCounter');
+  const detailThumbs = document.getElementById('detailThumbs');
+  const detailCategory = document.getElementById('detailCategory');
+  const detailTitle = document.getElementById('detailTitle');
+  const detailPriceBox = document.getElementById('detailPriceBox');
+  const detailDescText = document.getElementById('detailDescText');
+  const detailContactId = document.getElementById('detailContactId');
+  const copyIdBtn = document.getElementById('copyIdBtn');
 
   /* --------------------------------------------------------------------------
      Theme Management (Light / Dark Mode)
@@ -60,7 +79,6 @@
       setTheme(nextTheme);
     });
 
-    // Listen to OS theme changes if not explicitly set
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem('theme')) {
         setTheme(e.matches ? 'dark' : 'light');
@@ -75,6 +93,60 @@
     if (icon) {
       icon.textContent = theme === 'dark' ? 'light_mode' : 'dark_mode';
     }
+  }
+
+  /* --------------------------------------------------------------------------
+     Bookmarks Management (localStorage)
+     -------------------------------------------------------------------------- */
+  function loadBookmarks() {
+    try {
+      const raw = localStorage.getItem('karamatsu_bookmarks');
+      if (raw) {
+        bookmarks = new Set(JSON.parse(raw));
+      }
+    } catch (e) {
+      bookmarks = new Set();
+    }
+    updateBookmarkCountUI();
+  }
+
+  function saveBookmarks() {
+    localStorage.setItem('karamatsu_bookmarks', JSON.stringify(Array.from(bookmarks)));
+    updateBookmarkCountUI();
+  }
+
+  function toggleBookmark(itemId) {
+    const isAdded = !bookmarks.has(itemId);
+    if (isAdded) {
+      bookmarks.add(itemId);
+      showToast('ブックマークに追加しました');
+    } else {
+      bookmarks.delete(itemId);
+      showToast('ブックマークを解除しました');
+    }
+    saveBookmarks();
+    updateModalBookmarkBtn();
+    applyFiltersAndSort();
+    return isAdded;
+  }
+
+  function updateBookmarkCountUI() {
+    if (bookmarkCountSpan) {
+      bookmarkCountSpan.textContent = bookmarks.size;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     Toast Notification
+     -------------------------------------------------------------------------- */
+  let toastTimer;
+  function showToast(msg) {
+    clearTimeout(toastTimer);
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    toastTimer = setTimeout(() => {
+      toastEl.classList.remove('show');
+    }, 2200);
   }
 
   /* --------------------------------------------------------------------------
@@ -106,7 +178,6 @@
       }
     });
 
-    // Sort categories by item count descending
     const catCounts = {};
     allProducts.forEach(p => {
       const c = p.category || 'その他';
@@ -115,7 +186,6 @@
 
     const sortedCats = Array.from(categories).sort((a, b) => (catCounts[b] || 0) - (catCounts[a] || 0));
 
-    // Clear except 'all'
     categoryChipsContainer.innerHTML = '<button class="chip active" data-category="all">すべて</button>';
 
     sortedCats.forEach(cat => {
@@ -141,8 +211,11 @@
      Filtering & Sorting Logic
      -------------------------------------------------------------------------- */
   function applyFiltersAndSort() {
-    // 1. Filtering
     filteredProducts = allProducts.filter(item => {
+      // Bookmarks only filter
+      if (showBookmarksOnly && !bookmarks.has(item.id)) {
+        return false;
+      }
       // Category
       if (currentCategory !== 'all' && item.category !== currentCategory) {
         return false;
@@ -165,7 +238,7 @@
       return true;
     });
 
-    // 2. Sorting
+    // Sorting
     filteredProducts.sort((a, b) => {
       if (currentSort === 'newest') {
         // 案B: 完全新着順（最新ページ・管理番号降順）
@@ -192,21 +265,30 @@
       return 0;
     });
 
-    // Update Status Bar
+    // Status text
     productCount.textContent = `表示中: ${filteredProducts.length} 件 (全 ${allProducts.length} 件)`;
 
-    // Render Grid
     renderProducts();
   }
 
   /* --------------------------------------------------------------------------
-     DOM Rendering
+     DOM Rendering (Cards)
      -------------------------------------------------------------------------- */
   function renderProducts() {
     productGrid.innerHTML = '';
 
+    // Close any open card menus when re-rendering
+    closeAllCardMenus();
+
     if (filteredProducts.length === 0) {
       emptyState.style.display = 'block';
+      if (showBookmarksOnly) {
+        emptyTitle.textContent = 'ブックマークされた商品がありません';
+        emptyDesc.textContent = '商品カードのメニュー（︙）からブックマークに追加できます。';
+      } else {
+        emptyTitle.textContent = '該当する商品が見つかりませんでした';
+        emptyDesc.textContent = '検索条件やカテゴリを変更してお試しください。';
+      }
       paginationWrapper.style.display = 'none';
       return;
     }
@@ -216,12 +298,12 @@
     const itemsToDisplay = filteredProducts.slice(0, currentPage * ITEMS_PER_PAGE);
 
     const fragment = document.createDocumentFragment();
-    itemsToDisplay.forEach((item, index) => {
-      fragment.appendChild(createProductCard(item, index));
+    itemsToDisplay.forEach((item) => {
+      fragment.appendChild(createProductCard(item));
     });
     productGrid.appendChild(fragment);
 
-    // Pagination Button
+    // Pagination
     if (itemsToDisplay.length < filteredProducts.length) {
       paginationWrapper.style.display = 'flex';
       loadMoreBtn.textContent = `さらに表示する (残り ${filteredProducts.length - itemsToDisplay.length} 件)`;
@@ -230,21 +312,24 @@
     }
   }
 
-  function createProductCard(item, index) {
+  function createProductCard(item) {
     const card = document.createElement('article');
-    card.className = `product-card ${item.is_available ? 'available' : 'soldout'}`;
+    const isSoldOut = !item.is_available;
+    const isBookmarked = bookmarks.has(item.id);
 
-    const images = item.images && item.images.length > 0 ? item.images : ['logo2.gif'];
-    const mainImgUrl = images[0];
+    card.className = `product-card ${isSoldOut ? 'soldout' : 'available'}`;
+    card.dataset.id = item.id;
 
-    // Card Media Area
+    const images = item.images && item.images.length > 0 ? item.images : [];
+    const mainImgUrl = images[0] || '';
+
+    // 1. Media Area
     const mediaDiv = document.createElement('div');
     mediaDiv.className = 'card-media';
 
-    // Main Image
+    // Main Image Box
     const mainImgWrapper = document.createElement('div');
     mainImgWrapper.className = 'card-main-img-wrapper';
-    mainImgWrapper.title = 'タップして画像を拡大';
 
     const mainImg = document.createElement('img');
     mainImg.className = 'card-main-img';
@@ -253,29 +338,109 @@
     mainImg.loading = 'lazy';
     mainImgWrapper.appendChild(mainImg);
 
-    // Badges Overlay
-    const badgesDiv = document.createElement('div');
-    badgesDiv.className = 'card-badges';
+    // SOLD OUT Large Stamp Overlay if unavailable
+    if (isSoldOut) {
+      const soldBanner = document.createElement('div');
+      soldBanner.className = 'soldout-overlay-banner';
+      soldBanner.innerHTML = `<span class="soldout-stamp">SOLD OUT</span>`;
+      mainImgWrapper.appendChild(soldBanner);
+    }
 
-    const statusBadge = document.createElement('span');
-    statusBadge.className = `badge ${item.is_available ? 'badge-available' : 'badge-soldout'}`;
-    statusBadge.textContent = item.is_available ? '販売中' : 'SOLD OUT';
-
-    const pageBadge = document.createElement('span');
-    pageBadge.className = 'badge badge-page';
-    pageBadge.textContent = item.page ? `P.${item.page}` : '';
-
-    badgesDiv.appendChild(statusBadge);
-    if (item.page) badgesDiv.appendChild(pageBadge);
-    mediaDiv.appendChild(badgesDiv);
     mediaDiv.appendChild(mainImgWrapper);
 
-    // Click Main Image to open Lightbox
-    mainImgWrapper.addEventListener('click', () => {
-      openModal(images, 0, `${item.id} - ${item.title}`);
+    // Header Overlays (Badges & Three Dots Menu)
+    const headerBar = document.createElement('div');
+    headerBar.className = 'card-header-bar';
+
+    // Left Badges
+    const leftBadges = document.createElement('div');
+    leftBadges.className = 'card-left-badges';
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = `badge ${isSoldOut ? 'badge-soldout' : 'badge-available'}`;
+    statusBadge.textContent = isSoldOut ? '売り切れ' : '● 販売中';
+    leftBadges.appendChild(statusBadge);
+
+    if (item.page) {
+      const pageBadge = document.createElement('span');
+      pageBadge.className = 'badge badge-page';
+      pageBadge.textContent = `P.${item.page}`;
+      leftBadges.appendChild(pageBadge);
+    }
+    headerBar.appendChild(leftBadges);
+
+    // Right Action Box (Three Dots & Dropdown Menu)
+    const actionBox = document.createElement('div');
+    actionBox.className = 'card-action-box';
+
+    const moreBtn = document.createElement('button');
+    moreBtn.className = 'card-more-btn';
+    moreBtn.setAttribute('aria-label', 'メニュー');
+    moreBtn.title = '操作メニュー';
+    moreBtn.innerHTML = `<span class="material-symbols-outlined" style="font-size: 20px;">more_vert</span>`;
+
+    if (isBookmarked) {
+      const bmIndicator = document.createElement('span');
+      bmIndicator.className = 'card-bookmark-indicator';
+      bmIndicator.innerHTML = `★`;
+      moreBtn.appendChild(bmIndicator);
+    }
+
+    // Dropdown Menu
+    const dropdown = document.createElement('div');
+    dropdown.className = 'card-dropdown-menu';
+
+    // Menu Item 1: Bookmark
+    const bmItem = document.createElement('button');
+    bmItem.className = 'menu-item';
+    bmItem.innerHTML = `<span class="material-symbols-outlined">${isBookmarked ? 'bookmark_remove' : 'bookmark_add'}</span><span>${isBookmarked ? 'ブックマーク解除' : 'ブックマークに追加'}</span>`;
+    bmItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('show');
+      toggleBookmark(item.id);
     });
 
-    // Thumbnails (if multiple images)
+    // Menu Item 2: Copy ID
+    const copyItem = document.createElement('button');
+    copyItem.className = 'menu-item';
+    copyItem.innerHTML = `<span class="material-symbols-outlined">content_copy</span><span>管理番号をコピー</span>`;
+    copyItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('show');
+      navigator.clipboard.writeText(item.id).then(() => {
+        showToast(`管理番号「${item.id}」をコピーしました`);
+      });
+    });
+
+    // Menu Item 3: Open Details
+    const detailItem = document.createElement('button');
+    detailItem.className = 'menu-item';
+    detailItem.innerHTML = `<span class="material-symbols-outlined">visibility</span><span>詳細を見る</span>`;
+    detailItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdown.classList.remove('show');
+      openDetailModal(item);
+    });
+
+    dropdown.appendChild(bmItem);
+    dropdown.appendChild(copyItem);
+    dropdown.appendChild(detailItem);
+
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const wasOpen = dropdown.classList.contains('show');
+      closeAllCardMenus();
+      if (!wasOpen) {
+        dropdown.classList.add('show');
+      }
+    });
+
+    actionBox.appendChild(moreBtn);
+    actionBox.appendChild(dropdown);
+    headerBar.appendChild(actionBox);
+    mediaDiv.appendChild(headerBar);
+
+    // Thumbnails on Card (if > 1 image)
     if (images.length > 1) {
       const thumbsDiv = document.createElement('div');
       thumbsDiv.className = 'card-thumbs';
@@ -289,18 +454,10 @@
         thumbImg.loading = 'lazy';
         thumbBtn.appendChild(thumbImg);
 
-        // Hover or click thumb to switch main image
-        const activateThumb = () => {
+        thumbBtn.addEventListener('mouseenter', (e) => {
           mainImg.src = imgUrl;
           thumbsDiv.querySelectorAll('.card-thumb').forEach(t => t.classList.remove('active'));
           thumbBtn.classList.add('active');
-        };
-
-        thumbBtn.addEventListener('mouseenter', activateThumb);
-        thumbBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          activateThumb();
-          openModal(images, idx, `${item.id} - ${item.title}`);
         });
 
         thumbsDiv.appendChild(thumbBtn);
@@ -311,11 +468,10 @@
 
     card.appendChild(mediaDiv);
 
-    // Card Content
+    // 2. Card Content
     const contentDiv = document.createElement('div');
     contentDiv.className = 'card-content';
 
-    // Header (ID & Category)
     const headerDiv = document.createElement('div');
     headerDiv.className = 'card-header';
 
@@ -337,30 +493,6 @@
     titleH2.textContent = item.title ? `「${item.title}」` : item.id;
     contentDiv.appendChild(titleH2);
 
-    // Details Accordion
-    if (item.description) {
-      const detailsDiv = document.createElement('div');
-      detailsDiv.className = 'card-details';
-
-      const toggleBtn = document.createElement('button');
-      toggleBtn.className = 'details-toggle';
-      toggleBtn.innerHTML = `<span>詳細を見る</span><span class="material-symbols-outlined" style="font-size: 16px;">expand_more</span>`;
-
-      const detailsContent = document.createElement('div');
-      detailsContent.className = 'details-content';
-      detailsContent.textContent = item.description;
-
-      toggleBtn.addEventListener('click', () => {
-        const isOpen = detailsContent.classList.toggle('open');
-        toggleBtn.querySelector('span:first-child').textContent = isOpen ? '閉じる' : '詳細を見る';
-        toggleBtn.querySelector('.material-symbols-outlined').textContent = isOpen ? 'expand_less' : 'expand_more';
-      });
-
-      detailsDiv.appendChild(toggleBtn);
-      detailsDiv.appendChild(detailsContent);
-      contentDiv.appendChild(detailsDiv);
-    }
-
     // Price Row
     const priceRow = document.createElement('div');
     priceRow.className = 'card-price-row';
@@ -372,50 +504,148 @@
       priceDiv.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
     }
 
+    const statusLabel = document.createElement('span');
+    statusLabel.className = `card-status-label ${isSoldOut ? 'soldout' : 'available'}`;
+    statusLabel.textContent = isSoldOut ? 'SOLD OUT' : '販売中';
+
     priceRow.appendChild(priceDiv);
+    priceRow.appendChild(statusLabel);
     contentDiv.appendChild(priceRow);
+
     card.appendChild(contentDiv);
+
+    // Clicking anywhere on card opens Detail Popup Modal
+    card.addEventListener('click', () => {
+      openDetailModal(item);
+    });
 
     return card;
   }
 
+  function closeAllCardMenus() {
+    document.querySelectorAll('.card-dropdown-menu.show').forEach(m => m.classList.remove('show'));
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.card-action-box')) {
+      closeAllCardMenus();
+    }
+  });
+
   /* --------------------------------------------------------------------------
-     Modal / Lightbox
+     Product Detail Modal (ポップアップダイアログ & 画像拡大)
      -------------------------------------------------------------------------- */
-  function openModal(images, index, caption) {
-    currentModalImages = images;
-    currentModalIndex = index;
-    modalCaption.textContent = caption || '';
-    updateModalImage();
-    imageModal.classList.add('active');
-    imageModal.setAttribute('aria-hidden', 'false');
+  function openDetailModal(item) {
+    activeModalItem = item;
+    activeModalImgIndex = 0;
+
+    const isSoldOut = !item.is_available;
+    const isBookmarked = bookmarks.has(item.id);
+
+    // Header Badges
+    detailStatusBadge.className = `badge ${isSoldOut ? 'badge-soldout' : 'badge-available'}`;
+    detailStatusBadge.textContent = isSoldOut ? 'SOLD OUT' : '● 販売中';
+    detailIdBadge.textContent = item.id;
+    detailPageBadge.textContent = item.page ? `掲載: P.${item.page}` : '';
+
+    // Bookmark button in modal
+    updateModalBookmarkBtn();
+
+    // Category & Title
+    detailCategory.textContent = item.category ? `【${item.category}】` : '';
+    detailTitle.textContent = item.title ? `「${item.title}」` : item.id;
+
+    // Price
+    if (item.price) {
+      detailPriceBox.innerHTML = `<span class="detail-price-val">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
+    } else {
+      detailPriceBox.innerHTML = `<span class="detail-price-val">${item.price_raw || '要問合せ'}</span>`;
+    }
+
+    // Description
+    detailDescText.textContent = item.description || '説明文はありません。';
+
+    // Contact
+    detailContactId.textContent = item.id;
+
+    // Setup Gallery
+    const images = item.images && item.images.length > 0 ? item.images : [];
+    renderModalGallery(images);
+
+    // Show modal
+    detailModal.classList.add('active');
+    detailModal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
   }
 
-  function closeModal() {
-    imageModal.classList.remove('active');
-    imageModal.setAttribute('aria-hidden', 'true');
+  function updateModalBookmarkBtn() {
+    if (!activeModalItem) return;
+    const isBookmarked = bookmarks.has(activeModalItem.id);
+    const icon = detailBookmarkBtn.querySelector('.material-symbols-outlined');
+    if (isBookmarked) {
+      icon.textContent = 'bookmark';
+      detailBookmarkBtn.title = 'ブックマークを解除';
+      detailBookmarkBtn.style.color = 'var(--primary)';
+    } else {
+      icon.textContent = 'bookmark_border';
+      detailBookmarkBtn.title = 'ブックマークに追加';
+      detailBookmarkBtn.style.color = '';
+    }
+  }
+
+  function renderModalGallery(images) {
+    if (images.length === 0) {
+      detailMainImg.src = '';
+      detailThumbs.innerHTML = '';
+      detailPrevImg.style.display = 'none';
+      detailNextImg.style.display = 'none';
+      detailImgCounter.style.display = 'none';
+      return;
+    }
+
+    updateModalMainImg();
+
+    // Thumbnails
+    detailThumbs.innerHTML = '';
+    if (images.length > 1) {
+      detailPrevImg.style.display = 'flex';
+      detailNextImg.style.display = 'flex';
+      detailImgCounter.style.display = 'block';
+
+      images.forEach((imgUrl, idx) => {
+        const btn = document.createElement('div');
+        btn.className = `detail-thumb-btn ${idx === activeModalImgIndex ? 'active' : ''}`;
+        btn.innerHTML = `<img src="${imgUrl}" alt="サムネイル ${idx + 1}">`;
+        btn.addEventListener('click', () => {
+          activeModalImgIndex = idx;
+          updateModalMainImg();
+        });
+        detailThumbs.appendChild(btn);
+      });
+    } else {
+      detailPrevImg.style.display = 'none';
+      detailNextImg.style.display = 'none';
+      detailImgCounter.style.display = 'none';
+    }
+  }
+
+  function updateModalMainImg() {
+    if (!activeModalItem || !activeModalItem.images.length) return;
+    const images = activeModalItem.images;
+    detailMainImg.src = images[activeModalImgIndex];
+    detailImgCounter.textContent = `${activeModalImgIndex + 1} / ${images.length}`;
+
+    // Update active thumb
+    detailThumbs.querySelectorAll('.detail-thumb-btn').forEach((b, idx) => {
+      b.classList.toggle('active', idx === activeModalImgIndex);
+    });
+  }
+
+  function closeDetailModal() {
+    detailModal.classList.remove('active');
+    detailModal.setAttribute('aria-hidden', 'true');
     document.body.style.overflow = '';
-  }
-
-  function updateModalImage() {
-    if (!currentModalImages.length) return;
-    modalImg.src = currentModalImages[currentModalIndex];
-    modalCounter.textContent = `${currentModalIndex + 1} / ${currentModalImages.length}`;
-    modalPrev.style.visibility = currentModalImages.length > 1 ? 'visible' : 'hidden';
-    modalNext.style.visibility = currentModalImages.length > 1 ? 'visible' : 'hidden';
-  }
-
-  function nextModalImage() {
-    if (currentModalImages.length <= 1) return;
-    currentModalIndex = (currentModalIndex + 1) % currentModalImages.length;
-    updateModalImage();
-  }
-
-  function prevModalImage() {
-    if (currentModalImages.length <= 1) return;
-    currentModalIndex = (currentModalIndex - 1 + currentModalImages.length) % currentModalImages.length;
-    updateModalImage();
+    activeModalItem = null;
   }
 
   /* --------------------------------------------------------------------------
@@ -450,6 +680,14 @@
       applyFiltersAndSort();
     });
 
+    // Bookmark Filter Button
+    bookmarkFilterBtn.addEventListener('click', () => {
+      showBookmarksOnly = !showBookmarksOnly;
+      bookmarkFilterBtn.classList.toggle('active', showBookmarksOnly);
+      currentPage = 1;
+      applyFiltersAndSort();
+    });
+
     // Sort Select
     sortSelect.addEventListener('change', (e) => {
       currentSort = e.target.value;
@@ -464,6 +702,8 @@
       clearSearchBtn.style.display = 'none';
       availableOnlyToggle.checked = false;
       availableOnly = false;
+      showBookmarksOnly = false;
+      bookmarkFilterBtn.classList.remove('active');
       sortSelect.value = 'newest';
       currentSort = 'newest';
       currentCategory = 'all';
@@ -479,18 +719,53 @@
       renderProducts();
     });
 
-    // Modal Events
-    modalClose.addEventListener('click', closeModal);
-    modalBackdrop.addEventListener('click', closeModal);
-    modalPrev.addEventListener('click', prevModalImage);
-    modalNext.addEventListener('click', nextModalImage);
+    // Detail Modal Events
+    detailCloseBtn.addEventListener('click', closeDetailModal);
+    detailBackdrop.addEventListener('click', closeDetailModal);
+
+    detailBookmarkBtn.addEventListener('click', () => {
+      if (activeModalItem) {
+        toggleBookmark(activeModalItem.id);
+      }
+    });
+
+    detailPrevImg.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!activeModalItem || !activeModalItem.images.length) return;
+      activeModalImgIndex = (activeModalImgIndex - 1 + activeModalItem.images.length) % activeModalItem.images.length;
+      updateModalMainImg();
+    });
+
+    detailNextImg.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!activeModalItem || !activeModalItem.images.length) return;
+      activeModalImgIndex = (activeModalImgIndex + 1) % activeModalItem.images.length;
+      updateModalMainImg();
+    });
+
+    copyIdBtn.addEventListener('click', () => {
+      if (activeModalItem) {
+        navigator.clipboard.writeText(activeModalItem.id).then(() => {
+          showToast(`管理番号「${activeModalItem.id}」をコピーしました`);
+        });
+      }
+    });
 
     // Keyboard navigation
     document.addEventListener('keydown', (e) => {
-      if (!imageModal.classList.contains('active')) return;
-      if (e.key === 'Escape') closeModal();
-      else if (e.key === 'ArrowRight') nextModalImage();
-      else if (e.key === 'ArrowLeft') prevModalImage();
+      if (!detailModal.classList.contains('active')) return;
+      if (e.key === 'Escape') closeDetailModal();
+      else if (e.key === 'ArrowRight') {
+        if (activeModalItem && activeModalItem.images.length > 1) {
+          activeModalImgIndex = (activeModalImgIndex + 1) % activeModalItem.images.length;
+          updateModalMainImg();
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (activeModalItem && activeModalItem.images.length > 1) {
+          activeModalImgIndex = (activeModalImgIndex - 1 + activeModalItem.images.length) % activeModalItem.images.length;
+          updateModalMainImg();
+        }
+      }
     });
   }
 
@@ -498,6 +773,7 @@
      Entry Point
      -------------------------------------------------------------------------- */
   initTheme();
+  loadBookmarks();
   setupEventListeners();
   loadProducts();
 })();

@@ -3,30 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>カラマツトレイン 京都・天使突抜店 MINI入荷速報</title>
-  <meta name="description" content="カラマツトレイン京都・天使突抜店の鉄道グッズMINI入荷速報カタログ。制帽、腕章、腕時計、鉄道部品など最新アイテムを掲載。">
+  <title>テスト</title>
+  <meta name="description" content="カラマツトレイン京都・天使突抜店の鉄道グッズ入荷速報カタログ。">
   <!-- Fonts & Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- Top App Bar -->
+  <!-- Top App Bar ("テスト" のみ) -->
   <header class="app-bar">
     <div class="app-bar-content">
-      <div class="brand">
-        <div class="brand-icon">
-          <span class="material-symbols-outlined">train</span>
-        </div>
-        <div class="brand-text">
-          <span class="brand-subtitle">京都・天使突抜店</span>
-          <h1 class="brand-title">MINI入荷速報</h1>
-        </div>
-      </div>
-      
+      <h1 class="brand-title">テスト</h1>
       <div class="app-bar-actions">
         <button id="themeToggle" class="icon-button" aria-label="テーマ切り替え" title="ライト/ダークモード切替">
           <span class="material-symbols-outlined theme-icon">dark_mode</span>
@@ -37,20 +28,6 @@
 
   <!-- Main Container -->
   <main class="main-container">
-    
-    <!-- Hero / Info Banner -->
-    <section class="info-card">
-      <div class="info-body">
-        <div class="info-title">
-          <span class="material-symbols-outlined">info</span>
-          <span>ご注文・お問い合わせについて</span>
-        </div>
-        <p class="info-text">
-          電話・FAX: <strong>075-365-8128</strong>（11:00〜18:00）<br>
-          商品の在庫確認・ご予約は、管理番号（例：<strong>京都-2115</strong>）をお伝えください。
-        </p>
-      </div>
-    </section>
 
     <!-- Search & Filter Controls -->
     <section class="controls-section">
@@ -63,14 +40,22 @@
         </button>
       </div>
 
-      <!-- Controls Row: Availability & Sort -->
+      <!-- Controls Row: Availability, Bookmark, & Sort -->
       <div class="controls-row">
-        <!-- Availability Toggle -->
-        <label class="switch-control">
-          <input type="checkbox" id="availableOnlyToggle">
-          <span class="slider"></span>
-          <span class="switch-label">販売中のみ表示</span>
-        </label>
+        <div class="switches-group">
+          <!-- Availability Toggle -->
+          <label class="switch-control">
+            <input type="checkbox" id="availableOnlyToggle">
+            <span class="slider"></span>
+            <span class="switch-label">販売中のみ</span>
+          </label>
+
+          <!-- Bookmarks Filter Toggle -->
+          <button id="bookmarkFilterBtn" class="bookmark-filter-btn" title="ブックマークした商品のみ表示">
+            <span class="material-symbols-outlined bookmark-btn-icon">bookmark</span>
+            <span>ブックマーク (<span id="bookmarkCount">0</span>)</span>
+          </button>
+        </div>
 
         <!-- Sort Select -->
         <div class="sort-wrapper">
@@ -91,13 +76,11 @@
       <!-- Category Filter Chips -->
       <div class="category-chips" id="categoryChips">
         <button class="chip active" data-category="all">すべて</button>
-        <!-- Categories will be generated dynamically -->
       </div>
 
       <!-- Status Bar (Count & Active Filters) -->
       <div class="status-bar">
         <span id="productCount" class="count-text">読み込み中...</span>
-        <span id="activeFilterBadge" class="filter-badge" style="display: none;"></span>
       </div>
     </section>
 
@@ -110,8 +93,8 @@
       <!-- Empty State -->
       <div id="emptyState" class="empty-state" style="display: none;">
         <span class="material-symbols-outlined empty-icon">search_off</span>
-        <h3>該当する商品が見つかりませんでした</h3>
-        <p>検索条件やカテゴリを変更してお試しください。</p>
+        <h3 id="emptyTitle">該当する商品が見つかりませんでした</h3>
+        <p id="emptyDesc">検索条件やカテゴリを変更してお試しください。</p>
         <button id="resetFiltersBtn" class="filled-button">条件をリセット</button>
       </div>
 
@@ -122,36 +105,77 @@
     </section>
   </main>
 
-  <!-- Image Lightbox Modal -->
-  <div id="imageModal" class="modal" aria-hidden="true">
-    <div class="modal-backdrop" id="modalBackdrop"></div>
-    <div class="modal-dialog">
-      <button class="modal-close" id="modalClose" aria-label="閉じる">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-      <div class="modal-content">
-        <button class="modal-nav prev" id="modalPrev" aria-label="前の画像">
-          <span class="material-symbols-outlined">chevron_left</span>
-        </button>
-        <div class="modal-image-wrapper">
-          <img id="modalImg" src="" alt="拡大画像">
+  <!-- Product Detail Modal (ポップアップ詳細ダイアログ) -->
+  <div id="detailModal" class="modal" aria-hidden="true">
+    <div class="modal-backdrop" id="detailBackdrop"></div>
+    <div class="modal-dialog detail-dialog">
+      <div class="detail-modal-header">
+        <div class="detail-header-badges">
+          <span id="detailStatusBadge" class="badge"></span>
+          <span id="detailIdBadge" class="card-id"></span>
+          <span id="detailPageBadge" class="badge badge-page"></span>
         </div>
-        <button class="modal-nav next" id="modalNext" aria-label="次の画像">
-          <span class="material-symbols-outlined">chevron_right</span>
-        </button>
+        <div class="detail-header-actions">
+          <button id="detailBookmarkBtn" class="icon-button small" title="ブックマークに追加/解除">
+            <span class="material-symbols-outlined">bookmark_border</span>
+          </button>
+          <button class="icon-button small" id="detailCloseBtn" aria-label="閉じる">
+            <span class="material-symbols-outlined">close</span>
+          </button>
+        </div>
       </div>
-      <div class="modal-footer">
-        <span id="modalCaption" class="modal-caption"></span>
-        <span id="modalCounter" class="modal-counter">1 / 1</span>
+
+      <div class="detail-modal-body">
+        <!-- Image Gallery Area (拡大表示) -->
+        <div class="detail-gallery">
+          <div class="detail-main-img-box">
+            <img id="detailMainImg" src="" alt="商品画像" class="detail-main-img">
+            <button class="gallery-nav prev" id="detailPrevImg" aria-label="前の画像">
+              <span class="material-symbols-outlined">chevron_left</span>
+            </button>
+            <button class="gallery-nav next" id="detailNextImg" aria-label="次の画像">
+              <span class="material-symbols-outlined">chevron_right</span>
+            </button>
+            <span id="detailImgCounter" class="gallery-counter">1 / 1</span>
+          </div>
+          <div id="detailThumbs" class="detail-thumbs"></div>
+        </div>
+
+        <!-- Info Area -->
+        <div class="detail-info">
+          <div class="detail-category" id="detailCategory"></div>
+          <h2 class="detail-title" id="detailTitle"></h2>
+          <div class="detail-price-box" id="detailPriceBox"></div>
+
+          <div class="detail-desc-box">
+            <h4 class="section-heading">商品説明</h4>
+            <div class="detail-desc-text" id="detailDescText"></div>
+          </div>
+
+          <div class="detail-contact-box">
+            <div class="contact-header">
+              <span class="material-symbols-outlined">call</span>
+              <strong>ご注文・お問い合わせ</strong>
+            </div>
+            <p class="contact-phone">TEL・FAX: <strong>075-365-8128</strong>（11:00〜18:00）</p>
+            <p class="contact-hint">※お問い合わせの際は、管理番号「<strong id="detailContactId"></strong>」をお伝えください。</p>
+            <button id="copyIdBtn" class="outlined-button small-btn">
+              <span class="material-symbols-outlined">content_copy</span>
+              <span>管理番号をコピー</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
   <!-- Footer -->
   <footer class="app-footer">
     <div class="footer-content">
-      <p class="footer-brand">カラマツトレイン 京都・天使突抜店</p>
-      <p class="footer-note">※掲載情報は元サイト（karamatsu-train.jp）の入荷速報に基づき自動同期されています。</p>
+      <p class="footer-note">※掲載情報は元サイトの入荷速報に基づき自動同期されています。</p>
       <p class="footer-copy">&copy; 2026 Karamatsu Train Kyoto Store Catalog</p>
     </div>
   </footer>
