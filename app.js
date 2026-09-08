@@ -536,42 +536,22 @@
 
     const images = item.images && item.images.length > 0 ? item.images : [];
 
-    // --- 1. Card Header ---
+    // --- 1. Card Header: カテゴリ + 三点リーダーのみ ---
     const headerDiv = document.createElement('div');
     headerDiv.className = 'card-header';
 
     const headerLeft = document.createElement('div');
     headerLeft.className = 'card-header-left';
 
-    const idSpan = document.createElement('span');
-    idSpan.className = 'card-id';
-    idSpan.textContent = item.id;
-
-    const catSpan = document.createElement('span');
-    catSpan.className = 'card-category';
-    catSpan.textContent = item.category ? `【${item.category}】` : '';
-
-    headerLeft.appendChild(idSpan);
-    headerLeft.appendChild(catSpan);
+    if (item.category) {
+      const catSpan = document.createElement('span');
+      catSpan.className = 'card-category';
+      catSpan.textContent = `【${item.category}】`;
+      headerLeft.appendChild(catSpan);
+    }
 
     const headerRight = document.createElement('div');
     headerRight.className = 'card-header-right';
-
-    const priceBox = document.createElement('div');
-    priceBox.className = 'card-price-box';
-    if (item.price) {
-      priceBox.innerHTML = `<span class="card-price">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
-    } else {
-      priceBox.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
-    }
-    headerRight.appendChild(priceBox);
-
-    if (!isSoldOut) {
-      const statusLabel = document.createElement('span');
-      statusLabel.className = 'card-status-label available';
-      statusLabel.textContent = '販売中';
-      headerRight.appendChild(statusLabel);
-    }
 
     // Header More Menu (︙)
     const actionBox = document.createElement('div');
@@ -657,26 +637,30 @@
     headerDiv.appendChild(headerRight);
     card.appendChild(headerDiv);
 
-    // --- 2. Card Body (タイトル＋説明文、10行上限) ---
-    const bodyDiv = document.createElement('div');
-    bodyDiv.className = 'card-body';
-
-    if (item.title) {
-      const titleH2 = document.createElement('h2');
-      titleH2.className = 'card-title';
-      titleH2.textContent = item.title;
-      bodyDiv.appendChild(titleH2);
-    }
-
-    if (item.description) {
+    // --- 2. Text (全文普通のテキスト、10行上限) ---
+    const textContent = item.description || item.title || '';
+    if (textContent) {
       const descDiv = document.createElement('div');
       descDiv.className = 'card-text';
-      descDiv.textContent = item.description;
-      bodyDiv.appendChild(descDiv);
+      descDiv.textContent = textContent;
+      card.appendChild(descDiv);
     }
-    card.appendChild(bodyDiv);
 
-    // --- 3. Twitter-Style Adaptive Media Grid (1〜4枚) ---
+    // --- 3. Price Row (テキストと画像の間に配置) ---
+    const priceRow = document.createElement('div');
+    priceRow.className = 'card-price-row';
+
+    const priceBox = document.createElement('div');
+    priceBox.className = 'card-price-box';
+    if (item.price) {
+      priceBox.innerHTML = `<span class="card-price">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
+    } else {
+      priceBox.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
+    }
+    priceRow.appendChild(priceBox);
+    card.appendChild(priceRow);
+
+    // --- 4. Twitter-Style Adaptive Media Grid (1〜4枚) ---
     if (images.length > 0) {
       const mediaContainer = document.createElement('div');
       mediaContainer.className = 'tweet-media-container';
@@ -720,73 +704,6 @@
       mediaContainer.appendChild(mediaGrid);
       card.appendChild(mediaContainer);
     }
-
-    // --- 4. Card Footer Actions (Twitter風アクションバー) ---
-    const footerActions = document.createElement('div');
-    footerActions.className = 'card-footer-actions';
-
-    // Bookmark Action Button
-    const bmBtn = document.createElement('button');
-    bmBtn.className = `card-action-btn ${isBookmarked ? 'active' : ''}`;
-    bmBtn.title = isBookmarked ? 'ブックマークを解除' : 'ブックマークに追加';
-    bmBtn.innerHTML = `
-      <span class="material-symbols-outlined">${isBookmarked ? 'bookmark' : 'bookmark_border'}</span>
-      <span class="action-text">${isBookmarked ? '保存済み' : '保存'}</span>
-    `;
-    bmBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const added = toggleBookmark(item.id);
-      bmBtn.classList.toggle('active', added);
-      bmBtn.querySelector('.material-symbols-outlined').textContent = added ? 'bookmark' : 'bookmark_border';
-      bmBtn.querySelector('.action-text').textContent = added ? '保存済み' : '保存';
-    });
-
-    // Source Action Button
-    const srcBtn = document.createElement('button');
-    srcBtn.className = 'card-action-btn';
-    srcBtn.title = '元店舗ページを開く';
-    srcBtn.innerHTML = `
-      <span class="material-symbols-outlined">open_in_new</span>
-      <span class="action-text">元店舗</span>
-    `;
-    srcBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (item.source_url) window.open(item.source_url, '_blank');
-    });
-
-    // Copy ID Action Button
-    const copyBtn = document.createElement('button');
-    copyBtn.className = 'card-action-btn';
-    copyBtn.title = '管理番号をコピー';
-    copyBtn.innerHTML = `
-      <span class="material-symbols-outlined">content_copy</span>
-      <span class="action-text">${item.id}</span>
-    `;
-    copyBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      navigator.clipboard.writeText(item.id).then(() => {
-        showToast(`管理番号「${item.id}」をコピーしました`);
-      });
-    });
-
-    // Detail Action Button
-    const detailBtn = document.createElement('button');
-    detailBtn.className = 'card-action-btn';
-    detailBtn.title = '詳細ポップアップを開く';
-    detailBtn.innerHTML = `
-      <span class="material-symbols-outlined">visibility</span>
-      <span class="action-text">詳細</span>
-    `;
-    detailBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      openDetailModal(item);
-    });
-
-    footerActions.appendChild(bmBtn);
-    footerActions.appendChild(srcBtn);
-    footerActions.appendChild(copyBtn);
-    footerActions.appendChild(detailBtn);
-    card.appendChild(footerActions);
 
     // --- 5. Card Click Handler (カード本体クリックで詳細ポップアップ表示) ---
     const handleCardClick = () => {
