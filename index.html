@@ -20,38 +20,27 @@
     <!-- Navigation (PC: Side Rail / Mobile: Bottom Bar) -->
     <nav class="app-navigation" aria-label="メインナビゲーション">
       <div class="nav-items-group">
-        <button class="nav-item active" data-tab="home" id="tabHome">
+        <button class="nav-item active" data-tab="home" id="tabHome" title="ホーム" aria-label="ホーム">
           <span class="material-symbols-outlined nav-icon">home</span>
-          <span class="nav-label">ホーム</span>
         </button>
 
-        <button class="nav-item" data-tab="search" id="tabSearch">
+        <button class="nav-item" data-tab="search" id="tabSearch" title="検索" aria-label="検索">
           <span class="material-symbols-outlined nav-icon">search</span>
-          <span class="nav-label">検索</span>
         </button>
 
-        <button class="nav-item" data-tab="bookmarks" id="tabBookmarks">
+        <button class="nav-item" data-tab="bookmarks" id="tabBookmarks" title="ブックマーク" aria-label="ブックマーク">
           <span class="material-symbols-outlined nav-icon">bookmark</span>
-          <span class="nav-label">ブックマーク</span>
           <span class="nav-badge" id="navBookmarkBadge" style="display: none;">0</span>
         </button>
 
-        <button class="nav-item" data-tab="settings" id="tabSettings">
+        <button class="nav-item" data-tab="settings" id="tabSettings" title="設定" aria-label="設定">
           <span class="material-symbols-outlined nav-icon">settings</span>
-          <span class="nav-label">設定</span>
         </button>
       </div>
     </nav>
 
     <!-- Main Content Area -->
     <div class="content-wrapper">
-      
-      <!-- Top App Bar ("テスト" のみ) -->
-      <header class="app-bar">
-        <div class="app-bar-content">
-          <h1 class="brand-title">テスト</h1>
-        </div>
-      </header>
 
       <!-- Main Container -->
       <main class="main-container">
@@ -74,6 +63,14 @@
             <button class="quick-chip" data-query="運転スタフ">運転スタフ</button>
             <button class="quick-chip" data-query="サボ">サボ</button>
             <button class="quick-chip" data-query="腕章">腕章</button>
+          </div>
+
+          <!-- Category Filter Chips (検索タブ表示時のみ) -->
+          <div class="category-wrapper" id="categoryWrapper">
+            <span class="category-label">カテゴリ:</span>
+            <div class="category-chips" id="categoryChips">
+              <button class="chip active" data-category="all">すべて</button>
+            </div>
           </div>
         </section>
 
@@ -101,11 +98,6 @@
                 <span class="material-symbols-outlined select-arrow">arrow_drop_down</span>
               </div>
             </div>
-          </div>
-
-          <!-- Category Filter Chips -->
-          <div class="category-chips" id="categoryChips">
-            <button class="chip active" data-category="all">すべて</button>
           </div>
 
           <!-- Status Bar (Count) -->
@@ -186,7 +178,6 @@
               <h3 class="settings-card-title">クローラー実行履歴 (直近20件)</h3>
               <span class="history-badge-auto">日次自動更新</span>
             </div>
-            <p class="settings-card-desc">元サイト（カラマツトレイン京都店）の自動巡回・差分同期の履歴です。</p>
             <div id="crawlHistoryContainer" class="history-container">
               <!-- History items injected by JS -->
               <div class="history-loading">履歴を読み込み中...</div>
@@ -249,6 +240,31 @@
             <div class="detail-desc-text" id="detailDescText"></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Image Lightbox Modal (画像をタップしたときの全画面拡大詳細ビューア) -->
+  <div id="lightboxModal" class="lightbox-modal" aria-hidden="true">
+    <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+    <div class="lightbox-container">
+      <div class="lightbox-header">
+        <span id="lightboxCounter" class="lightbox-counter">1 / 1</span>
+        <span id="lightboxTitle" class="lightbox-title"></span>
+        <button id="lightboxCloseBtn" class="lightbox-close-btn" aria-label="閉じる">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="lightbox-body">
+        <button class="lightbox-nav prev" id="lightboxPrevBtn" aria-label="前の画像">
+          <span class="material-symbols-outlined">chevron_left</span>
+        </button>
+        <div class="lightbox-img-wrapper">
+          <img id="lightboxImg" src="" alt="商品拡大画像" class="lightbox-img">
+        </div>
+        <button class="lightbox-nav next" id="lightboxNextBtn" aria-label="次の画像">
+          <span class="material-symbols-outlined">chevron_right</span>
+        </button>
       </div>
     </div>
   </div>

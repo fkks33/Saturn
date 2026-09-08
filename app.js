@@ -77,6 +77,19 @@
   const detailPriceBox = document.getElementById('detailPriceBox');
   const detailDescText = document.getElementById('detailDescText');
 
+  // Lightbox Modal Elements (画像拡大ビューア)
+  const lightboxModal = document.getElementById('lightboxModal');
+  const lightboxBackdrop = document.getElementById('lightboxBackdrop');
+  const lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+  const lightboxPrevBtn = document.getElementById('lightboxPrevBtn');
+  const lightboxNextBtn = document.getElementById('lightboxNextBtn');
+  const lightboxCounter = document.getElementById('lightboxCounter');
+  const lightboxTitle = document.getElementById('lightboxTitle');
+  const lightboxImg = document.getElementById('lightboxImg');
+
+  let activeLightboxItem = null;
+  let activeLightboxIndex = 0;
+
   /* --------------------------------------------------------------------------
      Theme Management (Light / Dark Mode in Settings)
      -------------------------------------------------------------------------- */
@@ -120,15 +133,19 @@
     });
 
     if (tabName === 'home') {
-      searchSection.style.display = 'none'; // ホームに検索バーは不要
+      searchSection.style.display = 'none'; // ホームに検索バー・カテゴリは不要
       controlsSection.style.display = 'flex';
       productsSection.style.display = 'block';
       settingsSection.style.display = 'none';
       searchQuery = '';
       searchInput.value = '';
       clearSearchBtn.style.display = 'none';
+      currentCategory = 'all';
+      if (categoryChipsContainer) {
+        categoryChipsContainer.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.category === 'all'));
+      }
     } else if (tabName === 'search') {
-      searchSection.style.display = 'block'; // 検索タブで表示
+      searchSection.style.display = 'block'; // 検索タブで検索バーとカテゴリを表示
       controlsSection.style.display = 'flex';
       productsSection.style.display = 'block';
       settingsSection.style.display = 'none';
@@ -141,6 +158,10 @@
       searchQuery = '';
       searchInput.value = '';
       clearSearchBtn.style.display = 'none';
+      currentCategory = 'all';
+      if (categoryChipsContainer) {
+        categoryChipsContainer.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c.dataset.category === 'all'));
+      }
     } else if (tabName === 'settings') {
       searchSection.style.display = 'none';
       controlsSection.style.display = 'none';
@@ -446,6 +467,62 @@
     }
   }
 
+  /* --------------------------------------------------------------------------
+     Image Lightbox Modal (画像をタップしたときの全画面拡大詳細ビューア)
+     -------------------------------------------------------------------------- */
+  function openLightbox(item, imgIndex) {
+    if (!item || !item.images || item.images.length === 0) return;
+    activeLightboxItem = item;
+    activeLightboxIndex = imgIndex >= 0 && imgIndex < item.images.length ? imgIndex : 0;
+
+    updateLightboxContent();
+
+    lightboxModal.classList.add('active');
+    lightboxModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function updateLightboxContent() {
+    if (!activeLightboxItem || !activeLightboxItem.images.length) return;
+    const images = activeLightboxItem.images;
+    lightboxImg.src = images[activeLightboxIndex];
+    lightboxCounter.textContent = `${activeLightboxIndex + 1} / ${images.length}`;
+    lightboxTitle.textContent = activeLightboxItem.title || activeLightboxItem.id;
+
+    if (images.length > 1) {
+      lightboxPrevBtn.style.display = 'flex';
+      lightboxNextBtn.style.display = 'flex';
+    } else {
+      lightboxPrevBtn.style.display = 'none';
+      lightboxNextBtn.style.display = 'none';
+    }
+  }
+
+  function nextLightboxImg() {
+    if (!activeLightboxItem || !activeLightboxItem.images.length) return;
+    activeLightboxIndex = (activeLightboxIndex + 1) % activeLightboxItem.images.length;
+    updateLightboxContent();
+  }
+
+  function prevLightboxImg() {
+    if (!activeLightboxItem || !activeLightboxItem.images.length) return;
+    activeLightboxIndex = (activeLightboxIndex - 1 + activeLightboxItem.images.length) % activeLightboxItem.images.length;
+    updateLightboxContent();
+  }
+
+  function closeLightbox() {
+    lightboxModal.classList.remove('active');
+    lightboxModal.setAttribute('aria-hidden', 'true');
+    // detailModalが開いていなければスクロールロック解除
+    if (!detailModal.classList.contains('active')) {
+      document.body.style.overflow = '';
+    }
+    activeLightboxItem = null;
+  }
+
+  /* --------------------------------------------------------------------------
+     DOM Rendering: Twitter-Style Product Card
+     -------------------------------------------------------------------------- */
   function createProductCard(item) {
     const card = document.createElement('article');
     const isSoldOut = !item.is_available;
@@ -458,37 +535,45 @@
     card.setAttribute('aria-label', `${item.title || item.id} の詳細を表示`);
 
     const images = item.images && item.images.length > 0 ? item.images : [];
-    const mainImgUrl = images[0] || '';
 
-    // 1. Media Area
-    const mediaDiv = document.createElement('div');
-    mediaDiv.className = 'card-media';
+    // --- 1. Card Header ---
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'card-header';
 
-    // Main Image Box
-    const mainImgWrapper = document.createElement('div');
-    mainImgWrapper.className = 'card-main-img-wrapper';
+    const headerLeft = document.createElement('div');
+    headerLeft.className = 'card-header-left';
 
-    if (mainImgUrl) {
-      const mainImg = document.createElement('img');
-      mainImg.className = 'card-main-img';
-      mainImg.src = mainImgUrl;
-      mainImg.alt = item.title || item.id;
-      mainImg.loading = 'lazy';
-      mainImgWrapper.appendChild(mainImg);
+    const idSpan = document.createElement('span');
+    idSpan.className = 'card-id';
+    idSpan.textContent = item.id;
+
+    const catSpan = document.createElement('span');
+    catSpan.className = 'card-category';
+    catSpan.textContent = item.category ? `【${item.category}】` : '';
+
+    headerLeft.appendChild(idSpan);
+    headerLeft.appendChild(catSpan);
+
+    const headerRight = document.createElement('div');
+    headerRight.className = 'card-header-right';
+
+    const priceBox = document.createElement('div');
+    priceBox.className = 'card-price-box';
+    if (item.price) {
+      priceBox.innerHTML = `<span class="card-price">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
     } else {
-      mainImgWrapper.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;color:#666;height:100%;">
-          <span class="material-symbols-outlined" style="font-size:36px;">image_not_supported</span>
-          <span style="font-size:11px;margin-top:4px;">NO IMAGE</span>
-        </div>
-      `;
+      priceBox.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
     }
-    mediaDiv.appendChild(mainImgWrapper);
+    headerRight.appendChild(priceBox);
 
-    // Header Overlays (Three Dots Menu only)
-    const headerBar = document.createElement('div');
-    headerBar.className = 'card-header-bar';
+    if (!isSoldOut) {
+      const statusLabel = document.createElement('span');
+      statusLabel.className = 'card-status-label available';
+      statusLabel.textContent = '販売中';
+      headerRight.appendChild(statusLabel);
+    }
 
+    // Header More Menu (︙)
     const actionBox = document.createElement('div');
     actionBox.className = 'card-action-box';
 
@@ -505,11 +590,10 @@
       moreBtn.appendChild(bmIndicator);
     }
 
-    // Dropdown Menu
     const dropdown = document.createElement('div');
     dropdown.className = 'card-dropdown-menu';
 
-    // Menu Item 1: Bookmark
+    // Dropdown Item 1: Bookmark
     const bmItem = document.createElement('button');
     bmItem.className = 'menu-item';
     bmItem.innerHTML = `<span class="material-symbols-outlined">${isBookmarked ? 'bookmark_remove' : 'bookmark_add'}</span><span>${isBookmarked ? 'ブックマーク解除' : 'ブックマークに追加'}</span>`;
@@ -519,19 +603,17 @@
       toggleBookmark(item.id);
     });
 
-    // Menu Item 2: Open Source Page (元ページを開く)
+    // Dropdown Item 2: Open Source
     const sourceItem = document.createElement('button');
     sourceItem.className = 'menu-item';
     sourceItem.innerHTML = `<span class="material-symbols-outlined">open_in_new</span><span>元ページを開く</span>`;
     sourceItem.addEventListener('click', (e) => {
       e.stopPropagation();
       dropdown.classList.remove('show');
-      if (item.source_url) {
-        window.open(item.source_url, '_blank');
-      }
+      if (item.source_url) window.open(item.source_url, '_blank');
     });
 
-    // Menu Item 3: Copy ID
+    // Dropdown Item 3: Copy ID
     const copyItem = document.createElement('button');
     copyItem.className = 'menu-item';
     copyItem.innerHTML = `<span class="material-symbols-outlined">content_copy</span><span>管理番号をコピー</span>`;
@@ -543,7 +625,7 @@
       });
     });
 
-    // Menu Item 4: Open Details
+    // Dropdown Item 4: Details
     const detailItem = document.createElement('button');
     detailItem.className = 'menu-item';
     detailItem.innerHTML = `<span class="material-symbols-outlined">visibility</span><span>詳細を見る</span>`;
@@ -569,91 +651,144 @@
 
     actionBox.appendChild(moreBtn);
     actionBox.appendChild(dropdown);
-    headerBar.appendChild(actionBox);
-    mediaDiv.appendChild(headerBar);
+    headerRight.appendChild(actionBox);
 
-    // Thumbnails on Card (if > 1 image)
-    if (images.length > 1) {
-      const thumbsDiv = document.createElement('div');
-      thumbsDiv.className = 'card-thumbs';
+    headerDiv.appendChild(headerLeft);
+    headerDiv.appendChild(headerRight);
+    card.appendChild(headerDiv);
 
-      images.forEach((imgUrl, idx) => {
-        const thumbBtn = document.createElement('div');
-        thumbBtn.className = `card-thumb ${idx === 0 ? 'active' : ''}`;
-        const thumbImg = document.createElement('img');
-        thumbImg.src = imgUrl;
-        thumbImg.alt = `画像 ${idx + 1}`;
-        thumbImg.loading = 'lazy';
-        thumbBtn.appendChild(thumbImg);
+    // --- 2. Card Body (タイトル＋説明文、10行上限) ---
+    const bodyDiv = document.createElement('div');
+    bodyDiv.className = 'card-body';
 
-        const switchMainImg = (e) => {
-          if (e) e.stopPropagation();
-          const curMain = mainImgWrapper.querySelector('.card-main-img');
-          if (curMain) curMain.src = imgUrl;
-          thumbsDiv.querySelectorAll('.card-thumb').forEach(t => t.classList.remove('active'));
-          thumbBtn.classList.add('active');
-        };
+    if (item.title) {
+      const titleH2 = document.createElement('h2');
+      titleH2.className = 'card-title';
+      titleH2.textContent = item.title;
+      bodyDiv.appendChild(titleH2);
+    }
 
-        thumbBtn.addEventListener('mouseenter', switchMainImg);
-        thumbBtn.addEventListener('click', switchMainImg);
+    if (item.description) {
+      const descDiv = document.createElement('div');
+      descDiv.className = 'card-text';
+      descDiv.textContent = item.description;
+      bodyDiv.appendChild(descDiv);
+    }
+    card.appendChild(bodyDiv);
 
-        thumbsDiv.appendChild(thumbBtn);
+    // --- 3. Twitter-Style Adaptive Media Grid (1〜4枚) ---
+    if (images.length > 0) {
+      const mediaContainer = document.createElement('div');
+      mediaContainer.className = 'tweet-media-container';
+
+      const mediaGrid = document.createElement('div');
+      mediaGrid.className = 'tweet-media-grid';
+
+      const count = Math.min(images.length, 4);
+      mediaGrid.dataset.count = count;
+
+      images.slice(0, 4).forEach((imgUrl, idx) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'tweet-media-item';
+        itemDiv.dataset.index = idx;
+        itemDiv.title = 'タップして画像を拡大表示';
+
+        const img = document.createElement('img');
+        img.src = imgUrl;
+        img.alt = `${item.title || item.id} (画像 ${idx + 1})`;
+        img.loading = 'lazy';
+
+        itemDiv.appendChild(img);
+
+        // 4枚以上ある場合の4枚目バッジ（例: +2）
+        if (idx === 3 && images.length > 4) {
+          const moreBadge = document.createElement('div');
+          moreBadge.className = 'tweet-media-more-badge';
+          moreBadge.textContent = `+${images.length - 3}`;
+          itemDiv.appendChild(moreBadge);
+        }
+
+        // 画像をタップすると拡大ライトボックスを表示（カードクリックのバブリング防止）
+        itemDiv.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openLightbox(item, idx);
+        });
+
+        mediaGrid.appendChild(itemDiv);
       });
 
-      mediaDiv.appendChild(thumbsDiv);
+      mediaContainer.appendChild(mediaGrid);
+      card.appendChild(mediaContainer);
     }
 
-    card.appendChild(mediaDiv);
+    // --- 4. Card Footer Actions (Twitter風アクションバー) ---
+    const footerActions = document.createElement('div');
+    footerActions.className = 'card-footer-actions';
 
-    // 2. Card Content
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'card-content';
+    // Bookmark Action Button
+    const bmBtn = document.createElement('button');
+    bmBtn.className = `card-action-btn ${isBookmarked ? 'active' : ''}`;
+    bmBtn.title = isBookmarked ? 'ブックマークを解除' : 'ブックマークに追加';
+    bmBtn.innerHTML = `
+      <span class="material-symbols-outlined">${isBookmarked ? 'bookmark' : 'bookmark_border'}</span>
+      <span class="action-text">${isBookmarked ? '保存済み' : '保存'}</span>
+    `;
+    bmBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const added = toggleBookmark(item.id);
+      bmBtn.classList.toggle('active', added);
+      bmBtn.querySelector('.material-symbols-outlined').textContent = added ? 'bookmark' : 'bookmark_border';
+      bmBtn.querySelector('.action-text').textContent = added ? '保存済み' : '保存';
+    });
 
-    const headerDiv = document.createElement('div');
-    headerDiv.className = 'card-header';
+    // Source Action Button
+    const srcBtn = document.createElement('button');
+    srcBtn.className = 'card-action-btn';
+    srcBtn.title = '元店舗ページを開く';
+    srcBtn.innerHTML = `
+      <span class="material-symbols-outlined">open_in_new</span>
+      <span class="action-text">元店舗</span>
+    `;
+    srcBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (item.source_url) window.open(item.source_url, '_blank');
+    });
 
-    const idSpan = document.createElement('span');
-    idSpan.className = 'card-id';
-    idSpan.textContent = item.id;
+    // Copy ID Action Button
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'card-action-btn';
+    copyBtn.title = '管理番号をコピー';
+    copyBtn.innerHTML = `
+      <span class="material-symbols-outlined">content_copy</span>
+      <span class="action-text">${item.id}</span>
+    `;
+    copyBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navigator.clipboard.writeText(item.id).then(() => {
+        showToast(`管理番号「${item.id}」をコピーしました`);
+      });
+    });
 
-    const catSpan = document.createElement('span');
-    catSpan.className = 'card-category';
-    catSpan.textContent = item.category ? `【${item.category}】` : '';
+    // Detail Action Button
+    const detailBtn = document.createElement('button');
+    detailBtn.className = 'card-action-btn';
+    detailBtn.title = '詳細ポップアップを開く';
+    detailBtn.innerHTML = `
+      <span class="material-symbols-outlined">visibility</span>
+      <span class="action-text">詳細</span>
+    `;
+    detailBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDetailModal(item);
+    });
 
-    headerDiv.appendChild(idSpan);
-    headerDiv.appendChild(catSpan);
-    contentDiv.appendChild(headerDiv);
+    footerActions.appendChild(bmBtn);
+    footerActions.appendChild(srcBtn);
+    footerActions.appendChild(copyBtn);
+    footerActions.appendChild(detailBtn);
+    card.appendChild(footerActions);
 
-    // Title
-    const titleH2 = document.createElement('h2');
-    titleH2.className = 'card-title';
-    titleH2.textContent = item.title ? `「${item.title}」` : item.id;
-    contentDiv.appendChild(titleH2);
-
-    // Price Row
-    const priceRow = document.createElement('div');
-    priceRow.className = 'card-price-row';
-
-    const priceDiv = document.createElement('div');
-    if (item.price) {
-      priceDiv.innerHTML = `<span class="card-price">¥${item.price.toLocaleString()}</span><span class="card-price-unit">(税込)</span>`;
-    } else {
-      priceDiv.innerHTML = `<span class="card-price">${item.price_raw || '要問合せ'}</span>`;
-    }
-    priceRow.appendChild(priceDiv);
-
-    // 販売中のみ表示するラベル
-    if (!isSoldOut) {
-      const statusLabel = document.createElement('span');
-      statusLabel.className = 'card-status-label available';
-      statusLabel.textContent = '販売中';
-      priceRow.appendChild(statusLabel);
-    }
-
-    contentDiv.appendChild(priceRow);
-    card.appendChild(contentDiv);
-
-    // Card Click Handler (メニュー閉じた直後は発火しないガード付き)
+    // --- 5. Card Click Handler (カード本体クリックで詳細ポップアップ表示) ---
     const handleCardClick = () => {
       if (menuJustClosed) return;
       openDetailModal(item);
@@ -920,19 +1055,47 @@
       updateModalMainImg();
     });
 
-    // Keyboard navigation
+    // Lightbox Modal Events
+    lightboxCloseBtn.addEventListener('click', closeLightbox);
+    lightboxBackdrop.addEventListener('click', closeLightbox);
+    lightboxPrevBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      prevLightboxImg();
+    });
+    lightboxNextBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      nextLightboxImg();
+    });
+
+    // Detail Modal image zoom click
+    detailMainImg.style.cursor = 'zoom-in';
+    detailMainImg.addEventListener('click', () => {
+      if (activeModalItem && activeModalItem.images && activeModalItem.images.length) {
+        openLightbox(activeModalItem, activeModalImgIndex);
+      }
+    });
+
+    // Keyboard navigation (Supports Lightbox Modal & Detail Modal)
     document.addEventListener('keydown', (e) => {
-      if (!detailModal.classList.contains('active')) return;
-      if (e.key === 'Escape') closeDetailModal();
-      else if (e.key === 'ArrowRight') {
-        if (activeModalItem && activeModalItem.images.length > 1) {
-          activeModalImgIndex = (activeModalImgIndex + 1) % activeModalItem.images.length;
-          updateModalMainImg();
-        }
-      } else if (e.key === 'ArrowLeft') {
-        if (activeModalItem && activeModalItem.images.length > 1) {
-          activeModalImgIndex = (activeModalImgIndex - 1 + activeModalItem.images.length) % activeModalItem.images.length;
-          updateModalMainImg();
+      if (lightboxModal.classList.contains('active')) {
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === 'ArrowRight') nextLightboxImg();
+        else if (e.key === 'ArrowLeft') prevLightboxImg();
+        return;
+      }
+
+      if (detailModal.classList.contains('active')) {
+        if (e.key === 'Escape') closeDetailModal();
+        else if (e.key === 'ArrowRight') {
+          if (activeModalItem && activeModalItem.images.length > 1) {
+            activeModalImgIndex = (activeModalImgIndex + 1) % activeModalItem.images.length;
+            updateModalMainImg();
+          }
+        } else if (e.key === 'ArrowLeft') {
+          if (activeModalItem && activeModalItem.images.length > 1) {
+            activeModalImgIndex = (activeModalImgIndex - 1 + activeModalItem.images.length) % activeModalItem.images.length;
+            updateModalMainImg();
+          }
         }
       }
     });
